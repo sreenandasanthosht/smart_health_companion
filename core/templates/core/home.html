@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}Home &middot; {{ project_name }}{% endblock %}
+
+{% block content %}
+<div class="text-center">
+    <h1 class="display-5 fw-bold" style="color:#1F3864;">{{ project_name }}</h1>
+    <p class="lead text-muted">{{ tagline }}</p>
+    <span class="badge bg-success fs-6 my-3">&#10003; Django is running &mdash; MVT works!</span>
+</div>
+
+<div class="row justify-content-center mt-4">
+  <div class="col-md-8">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">What just happened (the MVT flow)</h5>
+        <ol class="mb-0">
+          <li>Your browser requested the URL <code>/</code>.</li>
+          <li><code>config/urls.py</code> sent it to the <b>core</b> app.</li>
+          <li><code>core/views.py</code> (the <b>View</b>) built some data and chose a <b>Template</b>.</li>
+          <li><code>core/templates/core/home.html</code> rendered this page you are reading.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
