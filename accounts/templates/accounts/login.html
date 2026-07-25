@@ -1,0 +1,24 @@
+{% extends 'base_auth.html' %}
+{% block title %}Log in &middot; Smart Health Companion{% endblock %}
+{% block side_title %}Welcome back.{% endblock %}
+{% block side_text %}Log in to reach your role-specific dashboard &mdash; patient, caregiver or provider.{% endblock %}
+
+{% block auth_content %}
+      <h1 class="a-title">Log in to your account</h1>
+      <p class="a-sub">Enter your details to continue to your dashboard.</p>
+
+      <div class="callout info">
+        <svg class="ic"><use href="#i-sparkles"/></svg>
+        <div class="c-body"><strong>Prototype.</strong> Sign-in isn't connected to real accounts yet &mdash; submitting takes you straight to the patient dashboard preview.</div>
+      </div>
+
+      <div class="panel"><div class="p-body" style="padding:24px;">
+        <form method="post" novalidate>
+          {% csrf_token %}
+          <div class="field"><label>{{ form.email.label }}</label>{{ form.email }}</div>
+          <div class="field"><label>{{ form.password.label }}</label>{{ form.password }}</div>
+          <button type="submit" class="btn btn-teal block" style="margin-top:4px;">Log in</button>
+        </form>
+      </div></div>
+      <div class="auth-foot">New here? <a href="{% url 'register' %}">Create an account</a></div>
+{% endblock %}

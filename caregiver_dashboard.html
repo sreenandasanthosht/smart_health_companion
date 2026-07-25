@@ -1,0 +1,121 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard · Smart Health Companion</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+<link href="shc.css" rel="stylesheet">
+</head><body><div class="app">
+<aside class="sidebar" id="sb">
+  <div class="brand"><span class="logo"><i class="bi bi-heart-pulse-fill"></i></span> Smart Health</div>
+  <div class="nav-section">Menu</div>
+  <a class="nav-link2 active" href="caregiver_dashboard.html"><i class="bi bi-grid-1x2-fill"></i> Dashboard</a>
+  <a class="nav-link2" href="caregiver_dashboard.html"><i class="bi bi-people"></i> My Patients</a>
+  <a class="nav-link2" href="caregiver_alerts.html"><i class="bi bi-bell"></i> Alerts</a>
+  <a class="nav-link2" href="caregiver_orders.html"><i class="bi bi-bag-plus"></i> Orders</a>
+  <a class="nav-link2" href="#"><i class="bi bi-calendar-check"></i> Appointments</a>
+  <div class="role-badge"><span class="av">M</span><div><div style="font-weight:600">Meera R.</div><div style="color:#9db4de;font-size:.78rem">Caregiver</div></div></div>
+</aside>
+<div class="main">
+  <div class="topbar">
+    <button class="icon-btn hamburger" onclick="document.getElementById('sb').classList.toggle('show')"><i class="bi bi-list"></i></button>
+    <div class="search"><i class="bi bi-search"></i><input placeholder="Search patients, alerts…"></div>
+    <button class="icon-btn"><i class="bi bi-bell"></i><span class="dot"></span></button>
+    <button class="icon-btn"><i class="bi bi-person"></i></button>
+  </div>
+  <div class="content">
+    <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
+      <div>
+        <h1 class="page-title">Hello, Meera</h1>
+        <div class="subtle">Here's how your family is doing today — Friday, 24 July 2026</div>
+      </div>
+      <a href="caregiver_orders.html" class="btn-gold mt-2 mt-md-0"><i class="bi bi-bag-plus"></i> Order refill</a>
+    </div>
+
+    <!-- KPI ROW -->
+    <div class="row g-3 mb-2">
+      <div class="col-6 col-xl-3"><div class="card2"><div class="kpi"><div class="chip tint-navy"><i class="bi bi-people-fill"></i></div><div><div class="num">2</div><div class="lbl">Linked patients</div></div></div></div></div>
+      <div class="col-6 col-xl-3"><div class="card2"><div class="kpi"><div class="chip tint-red"><i class="bi bi-exclamation-triangle-fill"></i></div><div><div class="num">1</div><div class="lbl">Alerts today</div></div></div></div></div>
+      <div class="col-6 col-xl-3"><div class="card2"><div class="kpi"><div class="chip tint-teal"><i class="bi bi-capsule"></i></div><div><div class="num">92%</div><div class="lbl">Adherence this week</div></div></div></div></div>
+      <div class="col-6 col-xl-3"><div class="card2"><div class="kpi"><div class="chip tint-amber"><i class="bi bi-arrow-repeat"></i></div><div><div class="num">1</div><div class="lbl">Refills due</div></div></div></div></div>
+    </div>
+
+    <div class="section-header">Linked patients</div>
+    <div class="row g-3">
+      <!-- LATHA -->
+      <div class="col-md-6">
+        <div class="card2 h-100">
+          <div class="bd">
+            <div class="d-flex align-items-center gap-3 mb-3">
+              <span class="av gold" style="width:52px;height:52px;font-size:1.2rem">L</span>
+              <div class="flex-fill">
+                <div style="font-weight:700;font-size:1.05rem">Latha R.</div>
+                <div class="subtle" style="font-size:.85rem">Mother · 68 years</div>
+              </div>
+              <span class="pill ok"><i class="bi bi-capsule"></i> 96% adherence</span>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mb-3">
+              <span class="pill info"><i class="bi bi-heart-pulse"></i> BP 128/82 · In range</span>
+              <span class="pill muted"><i class="bi bi-calendar-check"></i> Next: 28 Jul, Dr. A. Nair</span>
+            </div>
+            <a href="caregiver_patient_detail.html" class="btn-soft w-100 text-center d-block">View details</a>
+          </div>
+        </div>
+      </div>
+      <!-- RAMESH -->
+      <div class="col-md-6">
+        <div class="card2 h-100">
+          <div class="bd">
+            <div class="d-flex align-items-center gap-3 mb-3">
+              <span class="av" style="width:52px;height:52px;font-size:1.2rem">R</span>
+              <div class="flex-fill">
+                <div style="font-weight:700;font-size:1.05rem">Ramesh K.</div>
+                <div class="subtle" style="font-size:.85rem">Father · 72 years</div>
+              </div>
+              <span class="pill warn"><i class="bi bi-capsule"></i> 88% adherence</span>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mb-2">
+              <span class="pill warn"><i class="bi bi-droplet"></i> Sugar 168 mg/dL · Above range</span>
+              <span class="pill muted"><i class="bi bi-calendar-check"></i> Next: 02 Aug, City Care Clinic</span>
+            </div>
+            <div class="d-flex align-items-center gap-2 mb-3" style="color:var(--red);font-size:.85rem;font-weight:600">
+              <i class="bi bi-exclamation-triangle-fill"></i> Missed evening dose (Amlodipine 5mg)
+            </div>
+            <a href="caregiver_patient_detail.html" class="btn-soft w-100 text-center d-block">View details</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mt-1">
+      <div class="col-lg-7">
+        <div class="card2 h-100">
+          <div class="hd"><h5>Critical alerts</h5><a href="caregiver_alerts.html" class="subtle" style="font-size:.85rem">View all</a></div>
+          <div class="bd">
+            <div class="tl">
+              <div class="tl-item red"><div class="dot"></div><div class="t">Ramesh missed evening dose</div><div class="s">Amlodipine 5mg · Today, 8:30 PM</div></div>
+              <div class="tl-item gold"><div class="dot"></div><div class="t">Ramesh blood sugar above range</div><div class="s">168 mg/dL fasting · Today, 7:10 AM</div></div>
+              <div class="tl-item gold"><div class="dot"></div><div class="t">Latha — Metformin low stock</div><div class="s">4 tablets left · Yesterday</div></div>
+              <div class="tl-item teal"><div class="dot"></div><div class="t">Latha appointment tomorrow reminder</div><div class="s">Dr. A. Nair, 28 Jul · Confirmed</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="card2 h-100">
+          <div class="hd"><h5>This week's summary</h5></div>
+          <div class="bd">
+            <div class="banner teal mb-3"><i class="bi bi-check-circle-fill"></i>
+              <div>Overall adherence held at <b>92%</b> across both parents this week — up from 87% last week.</div>
+            </div>
+            <p class="mb-2" style="font-size:.92rem">Latha's blood pressure stayed in range all 7 days. Ramesh had 1 missed dose and 2 high fasting-sugar readings; consider ordering his Metformin refill soon.</p>
+            <div class="subtle" style="font-size:.8rem"><i class="bi bi-info-circle"></i> Informational — not a medical diagnosis.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</body></html>

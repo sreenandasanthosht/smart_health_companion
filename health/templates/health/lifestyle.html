@@ -1,0 +1,43 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Lifestyle &amp; Wellness &middot; Smart Health Companion{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar.html' with active='wellness' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Patient</span>
+        <h1>Lifestyle &amp; Wellness</h1>
+        <div class="page-sub">Log daily sleep, hydration and activity to build a picture of your everyday habits.</div>
+      </div>
+
+      <div class="callout info">
+        <svg class="ic"><use href="#i-sparkles"/></svg>
+        <div class="c-body"><strong>Prototype page.</strong> Placeholder entries shown &mdash; saving is disabled in this preview.</div>
+      </div>
+
+      <div class="grid g-8-4">
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-activity"/></svg> Recent entries</h3>
+          <table class="dtable">
+            <thead><tr><th>Date</th><th>Sleep</th><th>Water intake</th><th>Activity</th></tr></thead>
+            <tbody>
+              {% for e in entries %}
+              <tr><td>{{ e.date }}</td><td>{{ e.sleep }}</td><td>{{ e.water }}</td><td>{{ e.activity }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div></div>
+
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-droplet"/></svg> Log today</h3>
+          <form>
+            <div class="field"><label>Sleep (hours)</label><input type="number" step="0.1" class="inp" placeholder="e.g. 7.0"></div>
+            <div class="field"><label>Water intake (L)</label><input type="number" step="0.1" class="inp" placeholder="e.g. 2.0"></div>
+            <div class="field"><label>Activity</label><input type="text" class="inp" placeholder="e.g. 30 min walk"></div>
+            <button type="button" class="btn btn-teal block">Save entry</button>
+            <div class="hint">Saving is disabled in this preview.</div>
+          </form>
+        </div></div>
+      </div>
+
+{% endblock %}

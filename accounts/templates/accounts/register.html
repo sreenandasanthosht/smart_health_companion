@@ -1,0 +1,36 @@
+{% extends 'base_auth.html' %}
+{% block title %}Register &middot; Smart Health Companion{% endblock %}
+{% block side_title %}Create your account.{% endblock %}
+{% block side_text %}Choose the role that fits you &mdash; the fields and dashboard shown next adapt to it.{% endblock %}
+
+{% block auth_content %}
+      <h1 class="a-title">Create your account</h1>
+      <p class="a-sub">Choose the role that fits you &mdash; patient, caregiver or provider.</p>
+
+      <div class="callout info">
+        <svg class="ic"><use href="#i-sparkles"/></svg>
+        <div class="c-body"><strong>Prototype.</strong> Nothing is saved yet &mdash; continuing takes you to the onboarding preview.</div>
+      </div>
+
+      <div class="panel"><div class="p-body" style="padding:24px;">
+        <form method="post" novalidate>
+          {% csrf_token %}
+          <div class="field"><label>{{ form.full_name.label }}</label>{{ form.full_name }}</div>
+          <div class="field"><label>{{ form.email.label }}</label>{{ form.email }}</div>
+          <div class="field">
+            <label>I am a&hellip;</label>
+            <div class="role-pick">
+              {% for radio in form.role %}
+              <label>{{ radio.tag }} <span>{{ radio.choice_label }}</span></label>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="grid g-2" style="gap:14px;">
+            <div class="field"><label>{{ form.password.label }}</label>{{ form.password }}</div>
+            <div class="field"><label>{{ form.confirm_password.label }}</label>{{ form.confirm_password }}</div>
+          </div>
+          <button type="submit" class="btn btn-teal block" style="margin-top:4px;">Create account &amp; continue</button>
+        </form>
+      </div></div>
+      <div class="auth-foot">Already have an account? <a href="{% url 'login' %}">Log in</a></div>
+{% endblock %}

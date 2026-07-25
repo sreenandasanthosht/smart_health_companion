@@ -1,0 +1,151 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard · Smart Health Companion</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+<link href="shc.css" rel="stylesheet">
+</head><body><div class="app">
+
+<aside class="sidebar" id="sb">
+  <div class="brand"><span class="logo"><i class="bi bi-heart-pulse-fill"></i></span> Smart Health</div>
+  <div class="nav-section">Menu</div>
+  <a class="nav-link2 active" href="patient_dashboard.html"><i class="bi bi-grid-1x2-fill"></i> Dashboard</a>
+  <a class="nav-link2" href="patient_vitals.html"><i class="bi bi-activity"></i> Vitals</a>
+  <a class="nav-link2" href="patient_medications.html"><i class="bi bi-capsule"></i> Medications</a>
+  <a class="nav-link2" href="patient_prescription_upload.html"><i class="bi bi-file-medical"></i> Prescriptions</a>
+  <a class="nav-link2" href="patient_order_medicines.html"><i class="bi bi-bag-plus"></i> Order Medicines</a>
+  <a class="nav-link2" href="patient_appointments.html"><i class="bi bi-calendar-check"></i> Appointments</a>
+  <a class="nav-link2" href="patient_find_providers.html"><i class="bi bi-search-heart"></i> Find Providers</a>
+  <a class="nav-link2" href="patient_lifestyle.html"><i class="bi bi-bicycle"></i> Lifestyle &amp; Fitness</a>
+  <a class="nav-link2" href="patient_mind.html"><i class="bi bi-emoji-smile"></i> Mind <span class="pill info" style="margin-left:auto">Private</span></a>
+  <a class="nav-link2" href="patient_records_sharing.html"><i class="bi bi-shield-lock"></i> Records &amp; Sharing</a>
+  <a class="nav-link2" href="patient_profile.html"><i class="bi bi-person-gear"></i> Profile</a>
+  <div class="role-badge"><span class="av">L</span><div><div style="font-weight:600">Latha R.</div><div style="color:#9db4de;font-size:.78rem">Patient</div></div></div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <button class="icon-btn hamburger" onclick="document.getElementById('sb').classList.toggle('show')"><i class="bi bi-list"></i></button>
+    <div class="search"><i class="bi bi-search"></i><input placeholder="Search medications, readings, appointments…"></div>
+    <button class="icon-btn"><i class="bi bi-bell"></i><span class="dot"></span></button>
+    <button class="icon-btn"><i class="bi bi-person"></i></button>
+  </div>
+
+  <div class="content">
+    <div class="d-flex flex-wrap align-items-end justify-content-between mb-4 gap-2">
+      <div>
+        <h1 class="page-title">Good morning, Latha 👋</h1>
+        <div class="subtle">Thu, 24 Jul 2026 · Bengaluru</div>
+      </div>
+      <a href="patient_vitals.html" class="btn-navy"><i class="bi bi-plus-lg me-1"></i> Log a reading</a>
+    </div>
+
+    <!-- KPI row -->
+    <div class="row g-3">
+      <div class="col-6 col-xl-3"><div class="card2"><div class="kpi">
+        <div class="chip tint-teal"><i class="bi bi-capsule"></i></div>
+        <div><div class="num">2/3</div><div class="lbl">Doses taken today</div></div>
+      </div></div></div>
+      <div class="col-6 col-xl-3"><div class="card2"><div class="kpi">
+        <div class="chip tint-navy"><i class="bi bi-heart-pulse"></i></div>
+        <div><div class="num">128/82</div><div class="lbl">Latest BP <span class="pill ok"><i class="bi bi-check-circle-fill"></i> In range</span></div></div>
+      </div></div></div>
+      <div class="col-6 col-xl-3"><div class="card2"><div class="kpi">
+        <div class="chip tint-gold"><i class="bi bi-calendar-check"></i></div>
+        <div><div class="num">2 days</div><div class="lbl">Next appointment</div></div>
+      </div></div></div>
+      <div class="col-6 col-xl-3"><div class="card2"><div class="kpi">
+        <div class="chip tint-purple"><i class="bi bi-person-walking"></i></div>
+        <div><div class="num">4,120</div><div class="lbl">Steps today</div></div>
+      </div></div></div>
+    </div>
+
+    <div class="row g-3 mt-1">
+      <!-- LEFT -->
+      <div class="col-lg-7">
+        <div class="card2 mb-3">
+          <div class="hd"><h5>Today's medications</h5><span class="pill info"><i class="bi bi-clock"></i> 1 pending</span></div>
+          <div class="bd pt-2 pb-2">
+            <div class="row2 done">
+              <div class="cap tint-teal"><i class="bi bi-capsule"></i></div>
+              <div class="info"><div class="n">Metformin 500mg</div><div class="d">8:00 AM · With breakfast</div></div>
+              <span class="pill ok"><i class="bi bi-check-circle-fill"></i> Taken</span>
+            </div>
+            <div class="row2 done">
+              <div class="cap tint-teal"><i class="bi bi-capsule"></i></div>
+              <div class="info"><div class="n">Amlodipine 5mg</div><div class="d">8:00 AM · After food</div></div>
+              <span class="pill ok"><i class="bi bi-check-circle-fill"></i> Taken</span>
+            </div>
+            <div class="row2">
+              <div class="cap tint-navy"><i class="bi bi-capsule"></i></div>
+              <div class="info"><div class="n">Metformin 500mg</div><div class="d">9:00 PM · After dinner</div></div>
+              <div class="d-flex gap-2">
+                <button class="btn-soft"><i class="bi bi-alarm"></i> Snooze</button>
+                <button class="btn-take"><i class="bi bi-check-lg"></i> Mark taken</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card2">
+          <div class="hd"><h5>Blood pressure — last 7 days</h5><span class="pill ok"><i class="bi bi-shield-check"></i> Within safe range</span></div>
+          <div class="bd"><canvas id="bpSpark" height="120"></canvas></div>
+        </div>
+      </div>
+
+      <!-- RIGHT -->
+      <div class="col-lg-5">
+        <div class="card2 mb-3">
+          <div class="hd"><h5>Upcoming</h5></div>
+          <div class="bd">
+            <div class="tl">
+              <div class="tl-item">
+                <span class="dot"></span>
+                <div class="t">Dr. Nair — follow-up</div>
+                <div class="s">Sat, 26 Jul · 10:30 AM · City Care Clinic</div>
+              </div>
+              <div class="tl-item gold">
+                <span class="dot"></span>
+                <div class="t">Refill due — Metformin 500mg</div>
+                <div class="s">In about 3 days · 12 tablets left</div>
+              </div>
+              <div class="tl-item teal">
+                <span class="dot"></span>
+                <div class="t">Lab test — HbA1c</div>
+                <div class="s">Mon, 28 Jul · Prakash Diagnostics</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card2">
+          <div class="hd"><h5>Quick actions</h5></div>
+          <div class="bd d-flex flex-column gap-2">
+            <a class="qa" href="patient_vitals.html"><i class="tint-navy"><i class="bi bi-activity"></i></i> Log a vital reading</a>
+            <a class="qa" href="patient_prescription_upload.html"><i class="tint-teal"><i class="bi bi-file-medical"></i></i> Upload a prescription</a>
+            <a class="qa" href="patient_order_medicines.html"><i class="tint-gold"><i class="bi bi-bag-plus"></i></i> Order / refill medicine</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="subtle mt-3 mb-0"><i class="bi bi-info-circle me-1"></i>Insights are informational — not a medical diagnosis.</p>
+  </div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+Chart.defaults.font.family="Inter,system-ui,sans-serif";
+new Chart(document.getElementById('bpSpark'),{
+  type:'line',
+  data:{labels:['Fri','Sat','Sun','Mon','Tue','Wed','Thu'],
+    datasets:[
+      {label:'Systolic',data:[132,129,126,130,127,125,128],borderColor:'#17458C',backgroundColor:'rgba(23,69,140,.08)',fill:true,tension:.35,pointRadius:3,pointBackgroundColor:'#17458C'},
+      {label:'Diastolic',data:[85,83,81,84,82,80,82],borderColor:'#1E9E77',backgroundColor:'transparent',fill:false,tension:.35,pointRadius:3,pointBackgroundColor:'#1E9E77'}
+    ]},
+  options:{plugins:{legend:{display:false}},scales:{y:{min:60,max:150,grid:{color:'#EEF1F6'}},x:{grid:{display:false}}}}
+});
+</script>
+</body></html>

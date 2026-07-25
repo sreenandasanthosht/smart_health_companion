@@ -1,0 +1,127 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Users · Smart Health Companion</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+<link href="shc.css" rel="stylesheet">
+</head><body><div class="app">
+<aside class="sidebar" id="sb">
+  <div class="brand"><span class="logo"><i class="bi bi-heart-pulse-fill"></i></span> Smart Health</div>
+  <div class="nav-section">Admin</div>
+  <a class="nav-link2" href="admin_dashboard.html"><i class="bi bi-grid-1x2-fill"></i> Dashboard</a>
+  <a class="nav-link2" href="admin_verification.html"><i class="bi bi-patch-check"></i> Provider Verification</a>
+  <a class="nav-link2 active" href="admin_users.html"><i class="bi bi-people"></i> Users</a>
+  <a class="nav-link2" href="admin_providers.html"><i class="bi bi-hospital"></i> Providers</a>
+  <a class="nav-link2" href="#"><i class="bi bi-megaphone"></i> Announcements</a>
+  <a class="nav-link2" href="admin_audit_log.html"><i class="bi bi-clock-history"></i> Audit Log</a>
+  <div class="role-badge"><span class="av">A</span><div><div style="font-weight:600">Admin</div><div style="color:#9db4de;font-size:.78rem">Administrator</div></div></div>
+</aside>
+<div class="main">
+  <div class="topbar">
+    <button class="icon-btn hamburger" onclick="document.getElementById('sb').classList.toggle('show')"><i class="bi bi-list"></i></button>
+    <div class="search"><i class="bi bi-search"></i><input placeholder="Search users…"></div>
+    <button class="icon-btn"><i class="bi bi-bell"></i><span class="dot"></span></button>
+    <button class="icon-btn"><i class="bi bi-person"></i></button>
+  </div>
+  <div class="content">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <div>
+        <h1 class="page-title">Users</h1>
+        <div class="subtle">3,240 accounts · 2,110 active patients</div>
+      </div>
+      <button class="btn-navy"><i class="bi bi-download me-1"></i> Export CSV</button>
+    </div>
+
+    <!-- SEARCH + FILTERS -->
+    <div class="card2 mb-3">
+      <div class="bd">
+        <div class="row g-2 align-items-center">
+          <div class="col-md-5">
+            <div class="search" style="max-width:none"><i class="bi bi-search" style="position:absolute;left:14px;top:11px;color:var(--muted)"></i><input class="inp" style="padding-left:40px" placeholder="Search by name or email…"></div>
+          </div>
+          <div class="col-md-7">
+            <div class="d-flex flex-wrap gap-2 justify-content-md-end">
+              <span class="chip-f active">All roles</span>
+              <span class="chip-f">Patient</span>
+              <span class="chip-f">Caregiver</span>
+              <span class="chip-f">Provider</span>
+              <span class="chip-f">Pharmacy</span>
+              <span class="chip-f">Wellness</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card2">
+      <div class="bd p-0" style="overflow-x:auto">
+        <table class="tbl">
+          <thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Joined</th><th>Last active</th><th>Actions</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><div class="d-flex align-items-center gap-2"><span class="av sm">LR</span><div><div style="font-weight:600">Latha R.</div><div class="subtle" style="font-size:.8rem">latha.r@gmail.com</div></div></div></td>
+              <td><span class="pill info">Patient</span></td>
+              <td><span class="pill ok"><i class="bi bi-check-circle"></i> Active</span></td>
+              <td>12 Feb 2026</td><td>Today, 09:14</td>
+              <td><div class="d-flex gap-2"><button class="btn-soft"><i class="bi bi-eye"></i> View</button><button class="btn-danger2">Suspend</button></div></td>
+            </tr>
+            <tr>
+              <td><div class="d-flex align-items-center gap-2"><span class="av sm">RK</span><div><div style="font-weight:600">Ramesh K.</div><div class="subtle" style="font-size:.8rem">ramesh.kumar@gmail.com</div></div></div></td>
+              <td><span class="pill info">Patient</span></td>
+              <td><span class="pill ok"><i class="bi bi-check-circle"></i> Active</span></td>
+              <td>03 Mar 2026</td><td>Yesterday, 18:40</td>
+              <td><div class="d-flex gap-2"><button class="btn-soft"><i class="bi bi-eye"></i> View</button><button class="btn-danger2">Suspend</button></div></td>
+            </tr>
+            <tr>
+              <td><div class="d-flex align-items-center gap-2"><span class="av sm gold">MR</span><div><div style="font-weight:600">Meera R.</div><div class="subtle" style="font-size:.8rem">meera.r@gmail.com</div></div></div></td>
+              <td><span class="pill purple" style="background:#eae6fb;color:#5a3fb0">Caregiver</span></td>
+              <td><span class="pill ok"><i class="bi bi-check-circle"></i> Active</span></td>
+              <td>03 Mar 2026</td><td>Today, 08:02</td>
+              <td><div class="d-flex gap-2"><button class="btn-soft"><i class="bi bi-eye"></i> View</button><button class="btn-danger2">Suspend</button></div></td>
+            </tr>
+            <tr>
+              <td><div class="d-flex align-items-center gap-2"><span class="av sm">AN</span><div><div style="font-weight:600">Dr. A. Nair</div><div class="subtle" style="font-size:.8rem">dr.anair@citycare.in</div></div></div></td>
+              <td><span class="pill gold">Provider</span></td>
+              <td><span class="pill ok"><i class="bi bi-check-circle"></i> Active</span></td>
+              <td>15 Jan 2026</td><td>Today, 07:55</td>
+              <td><div class="d-flex gap-2"><button class="btn-soft"><i class="bi bi-eye"></i> View</button><button class="btn-danger2">Suspend</button></div></td>
+            </tr>
+            <tr>
+              <td><div class="d-flex align-items-center gap-2"><span class="av sm">MP</span><div><div style="font-weight:600">MedPlus Store</div><div class="subtle" style="font-size:.8rem">orders@medplus-blr.in</div></div></div></td>
+              <td><span class="pill gold">Pharmacy</span></td>
+              <td><span class="pill ok"><i class="bi bi-check-circle"></i> Active</span></td>
+              <td>28 Jan 2026</td><td>Today, 06:30</td>
+              <td><div class="d-flex gap-2"><button class="btn-soft"><i class="bi bi-eye"></i> View</button><button class="btn-danger2">Suspend</button></div></td>
+            </tr>
+            <tr>
+              <td><div class="d-flex align-items-center gap-2"><span class="av sm">FL</span><div><div style="font-weight:600">FitLife Centre</div><div class="subtle" style="font-size:.8rem">hello@fitlife.in</div></div></div></td>
+              <td><span class="pill muted">Wellness</span></td>
+              <td><span class="pill ok"><i class="bi bi-check-circle"></i> Active</span></td>
+              <td>18 Jul 2026</td><td>Today, 05:12</td>
+              <td><div class="d-flex gap-2"><button class="btn-soft"><i class="bi bi-eye"></i> View</button><button class="btn-danger2">Suspend</button></div></td>
+            </tr>
+            <tr>
+              <td><div class="d-flex align-items-center gap-2"><span class="av sm">SV</span><div><div style="font-weight:600">Suresh V.</div><div class="subtle" style="font-size:.8rem">suresh.v@gmail.com</div></div></div></td>
+              <td><span class="pill info">Patient</span></td>
+              <td><span class="pill bad"><i class="bi bi-slash-circle"></i> Suspended</span></td>
+              <td>09 Apr 2026</td><td>02 Jul 2026</td>
+              <td><div class="d-flex gap-2"><button class="btn-soft"><i class="bi bi-eye"></i> View</button><button class="btn-take">Reactivate</button></div></td>
+            </tr>
+            <tr>
+              <td><div class="d-flex align-items-center gap-2"><span class="av sm">PD</span><div><div style="font-weight:600">Prakash Diagnostics</div><div class="subtle" style="font-size:.8rem">lab@prakashdiag.in</div></div></div></td>
+              <td><span class="pill gold">Provider</span></td>
+              <td><span class="pill warn"><i class="bi bi-hourglass-split"></i> Pending</span></td>
+              <td>20 Jul 2026</td><td>Today, 10:41</td>
+              <td><div class="d-flex gap-2"><button class="btn-soft"><i class="bi bi-eye"></i> View</button><button class="btn-danger2">Suspend</button></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="subtle mt-2" style="font-size:.85rem">Showing 8 of 3,240 users</div>
+  </div>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</body></html>

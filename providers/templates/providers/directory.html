@@ -1,0 +1,39 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Find a Provider &middot; Smart Health Companion{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar.html' with active='providers' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Patient</span>
+        <h1>Find a Provider</h1>
+        <div class="page-sub">Browse verified doctors by name or specialty and request an appointment.</div>
+      </div>
+
+      <div class="callout info">
+        <svg class="ic"><use href="#i-sparkles"/></svg>
+        <div class="c-body"><strong>Prototype page.</strong> Search and booking are disabled in this preview.</div>
+      </div>
+
+      <div class="panel" style="margin-bottom:20px;"><div class="p-body" style="padding:16px 18px;">
+        <div class="search" style="max-width:none;"><svg class="ic"><use href="#i-search"/></svg><input placeholder="Search by name or specialty..." disabled></div>
+      </div></div>
+
+      <div class="grid g-3">
+        {% for p in providers %}
+        <div class="panel"><div class="p-body tall">
+          <div class="prov">
+            <div class="p-top">
+              <span class="avatar-lg">{{ p.name|slice:"3:4" }}{{ p.name|slice:"4:5" }}</span>
+              {% if p.verified %}<span class="pill verified"><svg class="ic" style="width:13px;height:13px;"><use href="#i-check"/></svg> Verified</span>{% endif %}
+            </div>
+            <div class="p-name">{{ p.name }}</div>
+            <div class="p-spec">{{ p.specialty }}</div>
+            <div class="p-meta">{{ p.experience }} experience</div>
+            <a href="{% url 'provider_appointments' %}" class="btn btn-teal block">Book appointment</a>
+          </div>
+        </div></div>
+        {% endfor %}
+      </div>
+
+{% endblock %}

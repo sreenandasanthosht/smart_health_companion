@@ -1,0 +1,57 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Appointments &middot; Smart Health Companion{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar.html' with active='appointments' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Patient</span>
+        <h1>Appointments</h1>
+        <div class="page-sub">See upcoming and past visits, and request a new appointment with a verified provider.</div>
+      </div>
+
+      <div class="callout info">
+        <svg class="ic"><use href="#i-sparkles"/></svg>
+        <div class="c-body"><strong>Prototype page.</strong> Requesting appointments is disabled in this preview.</div>
+      </div>
+
+      <div class="grid g-7-5">
+        <div>
+          <div class="panel" style="margin-bottom:20px;"><div class="p-body tall">
+            <h3 class="p-h"><svg class="ic"><use href="#i-calendar-days"/></svg> Upcoming</h3>
+            {% for a in upcoming %}
+            <div class="lrow">
+              <span class="ri tint-blue" style="width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:0 0 40px;"><svg class="ic"><use href="#i-calendar-days"/></svg></span>
+              <div class="grow"><div class="t">{{ a.provider }}</div><div class="s">{{ a.specialty }} &middot; {{ a.when }}</div></div>
+              <span class="pill ok">{{ a.status }}</span>
+            </div>
+            {% empty %}
+            <p style="color:var(--muted);font-size:13.5px;">No upcoming appointments.</p>
+            {% endfor %}
+          </div></div>
+
+          <div class="panel"><div class="p-body tall">
+            <h3 class="p-h"><svg class="ic"><use href="#i-clock"/></svg> Past</h3>
+            {% for a in past %}
+            <div class="lrow">
+              <span class="ri tint-purple" style="width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:0 0 40px;"><svg class="ic"><use href="#i-calendar-check"/></svg></span>
+              <div class="grow"><div class="t">{{ a.provider }}</div><div class="s">{{ a.specialty }} &middot; {{ a.when }}</div></div>
+              <span class="pill muted">{{ a.status }}</span>
+            </div>
+            {% endfor %}
+          </div></div>
+        </div>
+
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-stethoscope"/></svg> Book a new appointment</h3>
+          <div class="field"><label>Provider</label>
+            <select class="inp">{% for p in providers %}<option>{{ p }}</option>{% endfor %}</select></div>
+          <div class="field"><label>Date</label><input type="date" class="inp"></div>
+          <div class="field"><label>Time</label><input type="time" class="inp"></div>
+          <div class="field"><label>Reason for visit</label><textarea class="inp" rows="2" placeholder="Briefly describe your reason for visit"></textarea></div>
+          <button type="button" class="btn btn-teal block is-disabled" disabled>Request appointment</button>
+          <div class="hint">Disabled in preview.</div>
+        </div></div>
+      </div>
+
+{% endblock %}

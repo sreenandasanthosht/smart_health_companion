@@ -1,0 +1,40 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Caregiver Dashboard &middot; Smart Health Companion{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar.html' with active='caregiver' %}{% endblock %}
+{% block topbar_initials %}CG{% endblock %}
+{% block topbar_name %}Caregiver{% endblock %}
+{% block topbar_sub %}Read-only access{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Caregiver</span>
+        <h1>Monitoring: {{ patient_name }}</h1>
+        <div class="page-sub">Linked since {{ linked_since }} &middot; read-only view.</div>
+      </div>
+
+      <div class="callout muted">
+        <svg class="ic"><use href="#i-shield-alert"/></svg>
+        <div class="c-body">Mental-health entries are never shown here, even if other records are shared &mdash; they stay private to the patient at all times.</div>
+      </div>
+
+      {% for alert in critical_alerts %}
+      <div class="callout danger"><svg class="ic"><use href="#i-shield-alert"/></svg><div class="c-body">{{ alert.text }}</div></div>
+      {% endfor %}
+
+      <div class="grid stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:22px;">
+        {% for v in vitals_summary %}
+        <div class="card stat">
+          <div class="label">{{ v.label }}</div>
+          <div class="big" style="margin:2px 0 6px;">{{ v.value }}</div>
+          <span class="st {% if v.status == 'normal' %}ok{% elif v.status == 'watch' %}watch{% else %}high{% endif %}">{{ v.status|capfirst }}</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="panel"><div class="p-body tall">
+        <h3 class="p-h"><svg class="ic"><use href="#i-activity"/></svg> Weekly summary</h3>
+        <p style="color:var(--ink-soft);font-size:14px;margin:0;">{{ weekly_summary }}</p>
+      </div></div>
+
+{% endblock %}

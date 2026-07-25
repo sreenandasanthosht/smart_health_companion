@@ -1,0 +1,26 @@
+[
+  {
+    "caregiver_full_name": "Sunitha Varma",
+    "caregiver_email": "sunitha.varma.demo@example.com",
+    "patient_full_name": "Ramesh Varma",
+    "patient_email": "ramesh.varma.demo@example.com",
+    "relationship": "Spouse",
+    "note": "Caregiver links to patient via the patient's unique_id at signup/link-time (simple version per sprint scope - no request/approve flow)."
+  },
+  {
+    "caregiver_full_name": "Anoop Das",
+    "caregiver_email": "anoop.das.demo@example.com",
+    "patient_full_name": "Lakshmi Das",
+    "patient_email": "lakshmi.das.demo@example.com",
+    "relationship": "Adult child",
+    "note": "Caregiver links to patient via the patient's unique_id at signup/link-time (simple version per sprint scope - no request/approve flow)."
+  },
+  {
+    "caregiver_full_name": "Reshma Pillai",
+    "caregiver_email": "reshma.pillai.demo@example.com",
+    "patient_full_name": "Gopalakrishnan Pillai",
+    "patient_email": "gopalakrishnan.pillai.demo@example.com",
+    "relationship": "Adult child",
+    "note": "Caregiver links to patient via the patient's unique_id at signup/link-time (simple version per sprint scope - no request/approve flow)."
+  }
+]

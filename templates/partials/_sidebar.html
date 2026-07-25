@@ -1,0 +1,40 @@
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="logo">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="#fff"><path d="M12 21s-6.8-4.4-9.3-8.7C.9 8.9 2.7 4.8 6.7 4.8c2.1 0 3.6 1.3 5.3 3.4 1.7-2.1 3.2-3.4 5.3-3.4 4 0 5.8 4.1 4 7.5C18.8 16.6 12 21 12 21z"/><path d="M3.4 12.2H7l1.4-2.5 2.4 5 1.5-2.5h3.4" stroke="#0d9488" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="name">Smart Health<br>Companion</span>
+    </div>
+
+    <nav class="nav">
+      <a class="nav-item {% if active == 'dashboard' %}active{% endif %}" href="{% url 'health_dashboard' %}"><svg class="ic"><use href="#i-home"/></svg> Dashboard</a>
+      <a class="nav-item {% if active == 'profile' %}active{% endif %}" href="#"><svg class="ic"><use href="#i-user"/></svg> My Profile</a>
+      <a class="nav-item {% if active == 'vitals' %}active{% endif %}" href="{% url 'health_vitals' %}"><svg class="ic"><use href="#i-heart"/></svg> Log Vitals</a>
+      <a class="nav-item {% if active == 'appointments' %}active{% endif %}" href="{% url 'provider_appointments' %}"><svg class="ic"><use href="#i-calendar-days"/></svg> Appointments</a>
+      <a class="nav-item {% if active == 'medicines' %}active{% endif %}" href="{% url 'health_medications' %}"><svg class="ic"><use href="#i-pill"/></svg> Manage Medicines</a>
+      <a class="nav-item {% if active == 'providers' %}active{% endif %}" href="{% url 'provider_directory' %}"><svg class="ic"><use href="#i-stethoscope"/></svg> Healthcare Providers</a>
+      <a class="nav-item {% if active == 'wellness' %}active{% endif %}" href="{% url 'health_lifestyle' %}"><svg class="ic"><use href="#i-activity"/></svg> Wellness Services</a>
+      <a class="nav-item {% if active == 'mental' %}active{% endif %}" href="{% url 'health_mental_health' %}"><svg class="ic"><use href="#i-shield-alert"/></svg> Mental Health</a>
+      <a class="nav-item {% if active == 'sharing' %}active{% endif %}" href="{% url 'health_share' %}"><svg class="ic"><use href="#i-share"/></svg> Health Sharing</a>
+      <a class="nav-item {% if active == 'caregiver' %}active{% endif %}" href="{% url 'health_caregiver_dashboard' %}"><svg class="ic"><use href="#i-users"/></svg> Caregiver</a>
+      <div class="nav-sep"></div>
+      <a class="nav-item emergency" href="#"><svg class="ic"><use href="#i-shield-alert"/></svg>
+        <span>Emergency<span class="sub">Quick help in an emergency</span></span></a>
+    </nav>
+
+    <div class="journey">
+      <div class="journey-head"><b>Today's Health Journey</b><a href="#">View all &rarr;</a></div>
+      <div class="step"><span class="dot done"><svg class="ic"><use href="#i-check"/></svg></span><div><div class="t">Morning Medicine</div><div class="s">Completed</div></div></div>
+      <div class="step"><span class="dot done"><svg class="ic"><use href="#i-check"/></svg></span><div><div class="t">BP Logged</div><div class="s">Completed</div></div></div>
+      <div class="step"><span class="dot pending"></span><div><div class="t">Walk Goal</div><div class="s">Pending</div></div></div>
+      <div class="step"><span class="dot pending"></span><div><div class="t">Evening Medicine</div><div class="s">Pending</div></div></div>
+      <div class="step"><span class="dot pending"></span><div><div class="t">Water Goal</div><div class="s">Pending</div></div></div>
+      <svg class="plant" viewBox="0 0 80 80" fill="none">
+        <path d="M40 62c0-12-7-19-16-22 8-1 15 3 18 9 2-7 9-12 17-11-8 4-14 11-14 24z" fill="#34d399"/>
+        <path d="M40 62c0-9 4-16 11-20-5 5-7 11-7 20z" fill="#10b981"/>
+        <path d="M40 46c-1-8 3-15 10-18-5 6-6 12-6 18z" fill="#6ee7b7"/>
+        <path d="M28 60h24l-3 14a3 3 0 0 1-3 2H34a3 3 0 0 1-3-2z" fill="#d97757"/>
+        <path d="M27 58h26v4H27z" fill="#c2410c" opacity=".85"/>
+      </svg>
+    </div>
+  </aside>

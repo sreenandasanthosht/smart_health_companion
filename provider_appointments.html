@@ -1,0 +1,90 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Appointments · Smart Health Companion</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+<link href="shc.css" rel="stylesheet">
+</head><body><div class="app">
+<aside class="sidebar" id="sb">
+  <div class="brand"><span class="logo"><i class="bi bi-heart-pulse-fill"></i></span> Smart Health</div>
+  <div class="nav-section">Menu</div>
+  <a class="nav-link2" href="provider_dashboard.html"><i class="bi bi-grid-1x2-fill"></i> Dashboard</a>
+  <a class="nav-link2 active" href="provider_appointments.html"><i class="bi bi-calendar-check"></i> Appointments</a>
+  <a class="nav-link2" href="provider_consult.html"><i class="bi bi-file-medical"></i> Consultations</a>
+  <a class="nav-link2" href="provider_listings.html"><i class="bi bi-list-check"></i> Listings</a>
+  <a class="nav-link2" href="provider_profile_verification.html"><i class="bi bi-patch-check"></i> Profile &amp; Verification</a>
+  <a class="nav-link2" href="provider_announcements.html"><i class="bi bi-megaphone"></i> Announcements</a>
+  <div class="role-badge"><span class="av">A</span><div><div style="font-weight:600">Dr. A. Nair</div><div style="color:#9db4de;font-size:.78rem">Healthcare Provider</div></div></div>
+</aside>
+<div class="main">
+  <div class="topbar">
+    <button class="icon-btn hamburger" onclick="document.getElementById('sb').classList.toggle('show')"><i class="bi bi-list"></i></button>
+    <div class="search"><i class="bi bi-search"></i><input placeholder="Search patients…"></div>
+    <button class="icon-btn"><i class="bi bi-bell"></i><span class="dot"></span></button>
+    <button class="icon-btn"><i class="bi bi-person"></i></button>
+  </div>
+  <div class="content">
+    <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
+      <div><h1 class="page-title">Appointments</h1><p class="subtle mb-0">Manage your bookings and consultation notes</p></div>
+      <a href="#" class="btn-navy"><i class="bi bi-plus-lg me-1"></i> Block time off</a>
+    </div>
+
+    <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+      <button class="btn-soft"><i class="bi bi-chevron-left"></i></button>
+      <div class="chip-f active">Today · Thu 24 Jul</div>
+      <div class="chip-f">Fri 25 Jul</div>
+      <div class="chip-f">Sat 26 Jul</div>
+      <button class="btn-soft"><i class="bi bi-chevron-right"></i></button>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-lg-7">
+        <div class="card2">
+          <div class="hd"><h5>Thursday, 24 July 2026</h5><span class="pill info">6 bookings</span></div>
+          <div class="bd">
+            <div class="row2"><div class="cap tint-navy" style="flex-direction:column;font-size:.75rem;font-weight:700;line-height:1.1">09<br>30</div><div class="info"><div class="n">Latha R. <span class="pill muted">Teleconsult</span></div><div class="d">Diabetes follow-up · 20 min</div></div><span class="pill ok"><i class="bi bi-check-circle"></i> Confirmed</span></div>
+            <div class="d-flex gap-2 mb-2 ms-1 flex-wrap"><a href="provider_consult.html" class="btn-soft">Open consult</a><button class="btn-soft"><i class="bi bi-arrow-repeat me-1"></i>Reschedule</button></div>
+
+            <div class="row2"><div class="cap tint-navy" style="flex-direction:column;font-size:.75rem;font-weight:700;line-height:1.1">10<br>15</div><div class="info"><div class="n">Ramesh K. <span class="pill muted">In-clinic</span></div><div class="d">New consultation · 30 min</div></div><span class="pill ok"><i class="bi bi-check-circle"></i> Confirmed</span></div>
+            <div class="d-flex gap-2 mb-2 ms-1 flex-wrap"><a href="provider_consult.html" class="btn-soft">Open consult</a><button class="btn-soft"><i class="bi bi-arrow-repeat me-1"></i>Reschedule</button></div>
+
+            <div class="row2"><div class="cap tint-amber" style="flex-direction:column;font-size:.75rem;font-weight:700;line-height:1.1">11<br>00</div><div class="info"><div class="n">Suresh M. <span class="pill muted">In-clinic</span></div><div class="d">Follow-up · 15 min</div></div><span class="pill warn"><i class="bi bi-hourglass-split"></i> Pending</span></div>
+            <div class="d-flex gap-2 mb-2 ms-1 flex-wrap"><button class="btn-take"><i class="bi bi-check2 me-1"></i>Confirm</button><button class="btn-soft"><i class="bi bi-arrow-repeat me-1"></i>Reschedule</button></div>
+
+            <div class="row2"><div class="cap tint-navy" style="flex-direction:column;font-size:.75rem;font-weight:700;line-height:1.1">12<br>00</div><div class="info"><div class="n">Anitha D. <span class="pill muted">Teleconsult</span></div><div class="d">Thyroid review · 20 min</div></div><span class="pill ok"><i class="bi bi-check-circle"></i> Confirmed</span></div>
+            <div class="d-flex gap-2 mb-2 ms-1 flex-wrap"><a href="provider_consult.html" class="btn-soft">Open consult</a><button class="btn-soft"><i class="bi bi-arrow-repeat me-1"></i>Reschedule</button></div>
+
+            <div class="row2"><div class="cap tint-amber" style="flex-direction:column;font-size:.75rem;font-weight:700;line-height:1.1">15<br>30</div><div class="info"><div class="n">Prakash V. <span class="pill muted">In-clinic</span></div><div class="d">New consultation · 30 min</div></div><span class="pill warn"><i class="bi bi-hourglass-split"></i> Pending</span></div>
+            <div class="d-flex gap-2 mb-2 ms-1 flex-wrap"><button class="btn-take"><i class="bi bi-check2 me-1"></i>Confirm</button><button class="btn-soft"><i class="bi bi-arrow-repeat me-1"></i>Reschedule</button></div>
+
+            <div class="row2"><div class="cap tint-navy" style="flex-direction:column;font-size:.75rem;font-weight:700;line-height:1.1">16<br>15</div><div class="info"><div class="n">Kavya S. <span class="pill muted">In-clinic</span></div><div class="d">BP follow-up · 15 min</div></div><span class="pill ok"><i class="bi bi-check-circle"></i> Confirmed</span></div>
+            <div class="d-flex gap-2 ms-1 flex-wrap"><a href="provider_consult.html" class="btn-soft">Open consult</a><button class="btn-soft"><i class="bi bi-arrow-repeat me-1"></i>Reschedule</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-5">
+        <div class="card2">
+          <div class="hd"><h5>Add consultation note</h5><span class="pill muted">Latha R. · 09:30</span></div>
+          <div class="bd">
+            <div class="form-lbl">Patient</div>
+            <select class="inp mb-3"><option>Latha R. — 09:30 Teleconsult</option><option>Ramesh K. — 10:15 In-clinic</option><option>Anitha D. — 12:00 Teleconsult</option></select>
+            <div class="form-lbl">Note</div>
+            <div class="d-flex gap-2">
+              <textarea class="inp" rows="6" placeholder="Summary, advice given, next follow-up…">Reviewed shared vitals. Fasting sugar improving. Continue current plan; review in 4 weeks.</textarea>
+              <button class="mic"><i class="bi bi-mic"></i></button>
+            </div>
+            <div class="form-lbl mt-3">Follow-up in</div>
+            <select class="inp mb-3"><option>4 weeks</option><option>2 weeks</option><option>6 weeks</option><option>No follow-up</option></select>
+            <div class="d-flex gap-2"><button class="btn-navy flex-grow-1"><i class="bi bi-save me-1"></i>Save note</button><button class="btn-soft">Clear</button></div>
+            <p class="subtle mt-3 mb-0" style="font-size:.8rem"><i class="bi bi-shield-lock me-1"></i>Notes are shared back to the patient's record only with their standing consent.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</body></html>

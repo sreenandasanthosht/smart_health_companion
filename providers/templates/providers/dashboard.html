@@ -1,0 +1,57 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Provider Dashboard &middot; Smart Health Companion{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar_provider.html' with active='dashboard' %}{% endblock %}
+{% block topbar_initials %}AN{% endblock %}
+{% block topbar_name %}{{ provider_name }}{% endblock %}
+{% block topbar_sub %}Verified provider{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Provider</span>
+        <h1>Welcome, {{ provider_name }}</h1>
+        <div class="page-sub">Review appointment requests and manage your upcoming visits.</div>
+      </div>
+
+      <div class="callout info">
+        <svg class="ic"><use href="#i-sparkles"/></svg>
+        <div class="c-body"><strong>Prototype page.</strong> Accepting, declining and adding notes are disabled in this preview.</div>
+      </div>
+
+      <div class="grid g-2">
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-calendar-check"/></svg> Appointment requests</h3>
+          {% for r in requests %}
+          <div class="lrow" style="flex-direction:column;align-items:stretch;gap:10px;">
+            <div>
+              <div class="t">{{ r.patient }}</div>
+              <div class="s">Requested for {{ r.requested_for }} &middot; {{ r.reason }}</div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button type="button" class="btn btn-green is-disabled" style="padding:8px 14px;" disabled><svg class="ic"><use href="#i-check"/></svg> Accept</button>
+              <button type="button" class="btn btn-danger-ghost is-disabled" style="padding:8px 14px;" disabled>Decline</button>
+            </div>
+          </div>
+          {% empty %}
+          <p style="color:var(--muted);font-size:13.5px;">No pending requests.</p>
+          {% endfor %}
+        </div></div>
+
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-calendar-days"/></svg> Upcoming appointments</h3>
+          {% for u in upcoming %}
+          <div class="lrow">
+            <span class="ri tint-blue" style="width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:0 0 40px;"><svg class="ic"><use href="#i-user"/></svg></span>
+            <div class="grow"><div class="t">{{ u.patient }}</div><div class="s">{{ u.reason }}</div></div>
+            <div style="text-align:right;">
+              <div class="s" style="margin-bottom:6px;">{{ u.when }}</div>
+              <button type="button" class="btn btn-ghost is-disabled" style="padding:6px 12px;font-size:12.5px;" disabled>Add note</button>
+            </div>
+          </div>
+          {% empty %}
+          <p style="color:var(--muted);font-size:13.5px;">No upcoming appointments.</p>
+          {% endfor %}
+        </div></div>
+      </div>
+
+{% endblock %}

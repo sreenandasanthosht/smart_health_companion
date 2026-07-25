@@ -1,26 +1,56 @@
-{% extends 'base.html' %}
+{% extends 'base_dashboard.html' %}
 {% block title %}Home &middot; {{ project_name }}{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar.html' with active='' %}{% endblock %}
 
-{% block content %}
-<div class="text-center">
-    <h1 class="display-5 fw-bold" style="color:#1F3864;">{{ project_name }}</h1>
-    <p class="lead text-muted">{{ tagline }}</p>
-    <span class="badge bg-success fs-6 my-3">&#10003; Django is running &mdash; MVT works!</span>
-</div>
+{% block dashboard_content %}
 
-<div class="row justify-content-center mt-4">
-  <div class="col-md-8">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <h5 class="card-title">What just happened (the MVT flow)</h5>
-        <ol class="mb-0">
-          <li>Your browser requested the URL <code>/</code>.</li>
-          <li><code>config/urls.py</code> sent it to the <b>core</b> app.</li>
-          <li><code>core/views.py</code> (the <b>View</b>) built some data and chose a <b>Template</b>.</li>
-          <li><code>core/templates/core/home.html</code> rendered this page you are reading.</li>
-        </ol>
+      <div class="welcome">
+        <span class="pill ok" style="background:rgba(255,255,255,.18);color:#fff;margin-bottom:14px;">MDS482-4 Project-I &middot; Prototype build</span>
+        <h1>{{ project_name }}</h1>
+        <p>{{ tagline }}. One place for patients, caregivers and providers to track vitals, manage medications
+           with AI-assisted prescription reading, and stay connected &mdash; with mental-health data kept completely private.</p>
+        <div class="w-cta">
+          <a href="{% url 'register' %}" class="btn btn-white">Get started <svg class="ic"><use href="#i-arrow-right"/></svg></a>
+          <a href="{% url 'login' %}" class="btn btn-outline-white">Log in</a>
+        </div>
       </div>
-    </div>
-  </div>
-</div>
+
+      <div class="callout info">
+        <svg class="ic"><use href="#i-sparkles"/></svg>
+        <div class="c-body"><strong>Prototype preview.</strong> This home page and every section linked below are UI previews built for the project demo &mdash; content is placeholder data, not live from the database yet.</div>
+      </div>
+
+      <h3 class="p-h" style="margin:6px 0 14px;font-size:16px;"><svg class="ic"><use href="#i-activity"/></svg> What the system does</h3>
+      <div class="grid g-3" style="margin-bottom:24px;">
+        {% for f in features %}
+        <div class="panel"><div class="p-body tall">
+          <div class="feat">
+            <div class="f-ic {% cycle 'tint-green' 'tint-blue' 'tint-purple' 'tint-orange' as fcolor %}" style="font-size:22px;">{{ f.icon }}</div>
+            <h4>{{ f.title }}</h4>
+            <p>{{ f.text }}</p>
+            <a href="{% url f.url_name %}" class="f-link">Preview <svg class="ic"><use href="#i-arrow-right"/></svg></a>
+          </div>
+        </div></div>
+        {% endfor %}
+      </div>
+
+      <h3 class="p-h" style="margin:6px 0 14px;font-size:16px;"><svg class="ic"><use href="#i-users"/></svg> Built for three roles</h3>
+      <div class="grid g-3" style="margin-bottom:24px;">
+        {% for r in roles %}
+        <div class="panel"><div class="p-body tall" style="display:flex;flex-direction:column;height:100%;">
+          <span class="chip-role" style="align-self:flex-start;">{{ r.name }}</span>
+          <p style="color:var(--muted);font-size:13.5px;flex:1 1 auto;margin:0 0 14px;">{{ r.desc }}</p>
+          <a href="{% url r.url_name %}" class="btn btn-ghost" style="align-self:flex-start;">{{ r.cta }} <svg class="ic"><use href="#i-arrow-right"/></svg></a>
+        </div></div>
+        {% endfor %}
+      </div>
+
+      <div class="panel"><div class="p-body tall">
+        <h3 class="p-h"><svg class="ic"><use href="#i-file-text"/></svg> How a request becomes this page (the MVT flow)</h3>
+        <div class="grid g-2" style="gap:12px;">
+          <div class="callout muted" style="margin:0;"><svg class="ic"><use href="#i-arrow-right"/></svg><div class="c-body">Your browser requested <code>/</code> &rarr; <code>config/urls.py</code> routed it to the <strong>core</strong> app.</div></div>
+          <div class="callout muted" style="margin:0;"><svg class="ic"><use href="#i-arrow-right"/></svg><div class="c-body"><code>core/views.py</code> (the <strong>View</strong>) built the data and chose <code>core/templates/core/home.html</code> (the <strong>Template</strong>) you are reading.</div></div>
+        </div>
+      </div></div>
+
 {% endblock %}

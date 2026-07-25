@@ -1,0 +1,61 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Share Records &middot; Smart Health Companion{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar.html' with active='sharing' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Patient</span>
+        <h1>Share Records</h1>
+        <div class="page-sub">Generate a one-time, time-limited passcode so a provider can view specific records. Every share and revoke is written to an audit log. Mental-health entries are never included.</div>
+      </div>
+
+      <div class="callout info">
+        <svg class="ic"><use href="#i-sparkles"/></svg>
+        <div class="c-body"><strong>Prototype page.</strong> Generating and revoking shares is disabled in this preview.</div>
+      </div>
+
+      <div class="grid g-7-5">
+        <div>
+          <div class="panel" style="margin-bottom:20px;"><div class="p-body tall">
+            <h3 class="p-h"><svg class="ic"><use href="#i-share"/></svg> Active shares</h3>
+            {% for s in active_shares %}
+            <div class="lrow">
+              <div class="grow">
+                <div class="t">{{ s.with }}</div>
+                <div class="s">Scope: {{ s.scope }} &middot; Expires {{ s.expires }}</div>
+                <code>{{ s.code }}</code>
+              </div>
+              <button type="button" class="btn btn-danger-ghost is-disabled" disabled>Revoke</button>
+            </div>
+            {% empty %}
+            <p style="color:var(--muted);font-size:13.5px;">No active shares.</p>
+            {% endfor %}
+          </div></div>
+
+          <div class="panel"><div class="p-body tall">
+            <h3 class="p-h"><svg class="ic"><use href="#i-clock"/></svg> Share history</h3>
+            {% for h in history %}
+            <div class="kv"><span class="k">{{ h.with }} &middot; {{ h.scope }}</span><span class="v" style="color:var(--muted);font-weight:600;">{{ h.action }} &middot; {{ h.when }}</span></div>
+            {% endfor %}
+          </div></div>
+        </div>
+
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-stethoscope"/></svg> Create a new share</h3>
+          <div class="field"><label>Share with (provider)</label>
+            <select class="inp"><option>Dr. Anjali Nair &mdash; General Physician</option><option>Dr. Rohan Mehta &mdash; Cardiologist</option></select></div>
+          <div class="field"><label>What to include</label>
+            <label style="display:flex;align-items:center;gap:9px;font-weight:600;margin-bottom:8px;"><input type="checkbox" checked disabled> Vitals</label>
+            <label style="display:flex;align-items:center;gap:9px;font-weight:600;margin-bottom:8px;"><input type="checkbox" checked disabled> Medications</label>
+            <label style="display:flex;align-items:center;gap:9px;font-weight:600;margin-bottom:8px;"><input type="checkbox" disabled> Lifestyle logs</label>
+            <label style="display:flex;align-items:center;gap:9px;font-weight:600;color:var(--muted);"><input type="checkbox" disabled> Mental health (never shareable)</label>
+          </div>
+          <div class="field"><label>Expires after</label>
+            <select class="inp"><option>2 hours</option><option>24 hours</option><option>7 days</option></select></div>
+          <button type="button" class="btn btn-teal block is-disabled" disabled>Generate passcode</button>
+          <div class="hint">Disabled in preview.</div>
+        </div></div>
+      </div>
+
+{% endblock %}

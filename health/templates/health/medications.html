@@ -1,0 +1,62 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Medications &middot; Smart Health Companion{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar.html' with active='medicines' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Patient</span>
+        <h1>Medications</h1>
+        <div class="page-sub">Manage active medicines, upload a prescription for AI extraction, and get automatic drug-interaction checks.</div>
+      </div>
+
+      <div class="callout info">
+        <svg class="ic"><use href="#i-sparkles"/></svg>
+        <div class="c-body"><strong>Prototype page.</strong> The upload and confirm actions are disabled in this preview.</div>
+      </div>
+
+      <div class="grid g-2" style="margin-bottom:22px;">
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-pill"/></svg> Active medications</h3>
+          {% for m in active %}
+          <div class="lrow">
+            <span class="ri tint-green" style="width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:0 0 40px;"><svg class="ic"><use href="#i-pill"/></svg></span>
+            <div class="grow">
+              <div class="t">{{ m.name }} <span style="color:var(--muted);font-weight:600;">{{ m.dose }}</span></div>
+              <div class="s">{{ m.schedule }}</div>
+            </div>
+            <span class="pill muted">Refill in {{ m.refill_in }}</span>
+          </div>
+          {% endfor %}
+        </div></div>
+
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-upload-cloud"/></svg> Upload a prescription</h3>
+          <p style="color:var(--muted);font-size:13.5px;margin:0 0 14px;">Take a photo of a prescription or lab report. OCR converts it to text, then an LLM extracts the structured medicine details below for you to confirm before saving.</p>
+          <div class="field"><input type="file" class="inp" disabled></div>
+          <button type="button" class="btn btn-teal block is-disabled" disabled>Upload &amp; extract <svg class="ic"><use href="#i-arrow-right"/></svg></button>
+          <div class="hint">Disabled in preview.</div>
+        </div></div>
+      </div>
+
+      <div class="panel" style="margin-bottom:22px;"><div class="p-body tall">
+        <h3 class="p-h"><svg class="ic"><use href="#i-sparkles"/></svg> AI extraction preview</h3>
+        <p style="color:var(--muted);font-size:13.5px;margin:0 0 12px;">Example of what the OCR &rarr; LLM pipeline returns from an uploaded prescription image:</p>
+        <div class="callout muted"><svg class="ic"><use href="#i-file-text"/></svg><div class="c-body"><div style="font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:4px;">Raw OCR text</div><span style="white-space:pre-wrap;font-size:13px;">{{ extraction_demo.raw_text }}</span></div></div>
+        <table class="dtable">
+          <thead><tr><th>Medicine</th><th>Dose</th><th>Duration</th><th>Extraction confidence</th></tr></thead>
+          <tbody>
+            {% for row in extraction_demo.extracted %}
+            <tr><td style="font-weight:700;">{{ row.medicine }}</td><td>{{ row.dose }}</td><td>{{ row.duration }}</td><td><span class="pill ok">{{ row.confidence }}</span></td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <button type="button" class="btn btn-green is-disabled" style="margin-top:14px;" disabled><svg class="ic"><use href="#i-check"/></svg> Confirm &amp; save</button>
+      </div></div>
+
+      <div class="callout danger">
+        <svg class="ic"><use href="#i-shield-alert"/></svg>
+        <div class="c-body"><strong>Drug interaction warning (example).</strong> {{ interaction_warning.drug_a }} + {{ interaction_warning.drug_b }}: {{ interaction_warning.note }}</div>
+      </div>
+
+{% endblock %}

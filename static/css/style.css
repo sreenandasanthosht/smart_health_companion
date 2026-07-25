@@ -1,2 +1,259 @@
-/* Your custom styles go here (Bootstrap handles most of it). */
-body { background-color: #f7f9fc; }
+/* ============================================================
+   Smart Health Companion — theme layer
+   Sits on top of Bootstrap 5. Refines colours, typography,
+   navbar, cards, buttons, tables, forms and badges so the
+   existing templates get a cohesive, polished look.
+   (Brand identity kept: navy + gold, healthcare-calm.)
+   ============================================================ */
+
+:root {
+    /* Brand palette */
+    --shc-navy:        #1F3864;
+    --shc-navy-700:    #182c4e;
+    --shc-navy-600:    #2E5AA3;
+    --shc-navy-050:    #eef2f9;
+    --shc-gold:        #f5c243;
+    --shc-gold-600:    #e0a92c;
+    --shc-teal:        #0f8a80;
+    --shc-purple:      #4A235A;
+
+    /* Semantic */
+    --shc-success:     #2E7D32;
+    --shc-watch:       #B98900;
+    --shc-danger:      #C0392B;
+
+    /* Neutrals / surfaces */
+    --shc-bg:          #f4f7fc;
+    --shc-surface:     #ffffff;
+    --shc-border:      #e6ecf5;
+    --shc-ink:         #1c2536;
+    --shc-muted:       #5f6b7e;
+
+    /* Effects */
+    --shc-radius:      .85rem;
+    --shc-radius-sm:   .55rem;
+    --shc-shadow-sm:   0 1px 2px rgba(23, 44, 78, .06), 0 2px 8px rgba(23, 44, 78, .05);
+    --shc-shadow-md:   0 6px 22px rgba(23, 44, 78, .10);
+    --shc-shadow-lg:   0 18px 48px rgba(23, 44, 78, .18);
+}
+
+/* ---------- Base / typography ---------- */
+body {
+    background-color: var(--shc-bg);
+    color: var(--shc-ink);
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, h5, h6, .navbar-brand { letter-spacing: -.01em; }
+.text-muted { color: var(--shc-muted) !important; }
+a { color: var(--shc-navy-600); text-underline-offset: 2px; }
+a:hover { color: var(--shc-navy); }
+
+/* Soften Bootstrap's default heavy links inside cards */
+.card a.small { font-weight: 600; }
+
+/* ---------- Navbar ---------- */
+.navbar.navbar-dark {
+    background: linear-gradient(100deg, var(--shc-navy-700) 0%, var(--shc-navy) 55%, var(--shc-navy-600) 130%) !important;
+    box-shadow: 0 2px 14px rgba(23, 44, 78, .22);
+    padding-top: .6rem;
+    padding-bottom: .6rem;
+}
+.navbar .navbar-brand { font-weight: 700; font-size: 1.12rem; display: inline-flex; align-items: center; gap: .5rem; }
+.navbar .navbar-brand .brand-dot {
+    width: 26px; height: 26px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--shc-gold), var(--shc-gold-600));
+    color: var(--shc-navy); display: inline-flex; align-items: center; justify-content: center;
+    font-size: .95rem; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25);
+}
+.navbar .badge.bg-warning { letter-spacing: .06em; font-weight: 700; }
+.navbar-dark .navbar-nav .nav-link {
+    color: rgba(255,255,255,.82);
+    font-weight: 500;
+    border-radius: .5rem;
+    padding-left: .8rem; padding-right: .8rem;
+    transition: color .15s ease, background-color .15s ease;
+}
+.navbar-dark .navbar-nav .nav-link:hover,
+.navbar-dark .navbar-nav .nav-link:focus { color: #fff; background: rgba(255,255,255,.10); }
+.dropdown-menu {
+    border: 1px solid var(--shc-border);
+    border-radius: var(--shc-radius-sm);
+    box-shadow: var(--shc-shadow-md);
+    padding: .4rem;
+    margin-top: .4rem !important;
+}
+.dropdown-item { border-radius: .4rem; padding: .5rem .7rem; font-size: .93rem; }
+.dropdown-item:hover, .dropdown-item:focus { background: var(--shc-navy-050); color: var(--shc-navy); }
+
+/* ---------- Cards ---------- */
+.card {
+    border: 1px solid var(--shc-border);
+    border-radius: var(--shc-radius);
+    background: var(--shc-surface);
+}
+.card-title { color: var(--shc-navy); }
+.shc-card {
+    border: 1px solid var(--shc-border);
+    border-radius: var(--shc-radius);
+    box-shadow: var(--shc-shadow-sm);
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.shc-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shc-shadow-md);
+    border-color: #d5e0f0;
+}
+
+.shc-icon-circle {
+    width: 52px; height: 52px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.4rem;
+    background: linear-gradient(135deg, var(--shc-navy-050), #dfe8f6);
+    color: var(--shc-navy);
+    box-shadow: inset 0 0 0 1px rgba(31,56,100,.06);
+}
+
+/* ---------- Status text ---------- */
+.status-normal { color: var(--shc-success); font-weight: 600; }
+.status-watch  { color: var(--shc-watch);   font-weight: 600; }
+.status-high   { color: var(--shc-danger);  font-weight: 600; }
+
+/* ---------- Badges / chips ---------- */
+.badge { font-weight: 600; letter-spacing: .01em; padding: .38em .6em; border-radius: .5rem; }
+.badge-verified { background: var(--shc-success); color: #fff; font-size: .7rem; }
+.badge-pending  { background: var(--shc-watch);   color: #fff; font-size: .7rem; }
+.private-lock   { background: var(--shc-purple);  color: #fff; font-size: .7rem; }
+
+.role-chip {
+    border: 1px solid rgba(31,56,100,.28);
+    background: var(--shc-navy-050);
+    color: var(--shc-navy);
+    border-radius: 2rem;
+    padding: .28rem .85rem;
+    font-size: .74rem;
+    font-weight: 700;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+}
+
+/* ---------- Hero ---------- */
+.hero-shc {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, var(--shc-navy-700) 0%, var(--shc-navy) 45%, var(--shc-navy-600) 100%);
+    color: #fff;
+    border-radius: 1.25rem;
+    box-shadow: var(--shc-shadow-lg);
+}
+.hero-shc::after {
+    content: "";
+    position: absolute; inset: 0;
+    background:
+        radial-gradient(520px 320px at 88% -10%, rgba(245,194,67,.28), transparent 60%),
+        radial-gradient(420px 300px at 8% 120%, rgba(15,138,128,.30), transparent 60%);
+    pointer-events: none;
+}
+.hero-shc > * { position: relative; z-index: 1; }
+.hero-shc .lead { color: rgba(255,255,255,.88); }
+
+/* ---------- Buttons ---------- */
+.btn { border-radius: .6rem; font-weight: 600; transition: transform .12s ease, box-shadow .15s ease, filter .15s ease; }
+.btn:active { transform: translateY(1px); }
+
+/* Primary navy buttons — templates set style="background:#1F3864".
+   This upgrades those + any .btn-primary to a consistent navy button. */
+.btn-primary,
+.btn[style*="1F3864"] {
+    background: var(--shc-navy) !important;
+    border-color: var(--shc-navy) !important;
+    color: #fff !important;
+    box-shadow: 0 4px 12px rgba(31,56,100,.22);
+}
+.btn-primary:hover,
+.btn[style*="1F3864"]:hover { filter: brightness(1.08); box-shadow: 0 6px 16px rgba(31,56,100,.30); }
+.btn[style*="1F3864"]:disabled { filter: none; opacity: .55; box-shadow: none; }
+
+/* Purple (mental-health "save privately") */
+.btn[style*="4A235A"] { box-shadow: 0 4px 12px rgba(74,35,90,.24); }
+.btn[style*="4A235A"]:hover { filter: brightness(1.1); }
+
+/* Green (confirm / accept) */
+.btn[style*="2E7D32"] { box-shadow: 0 4px 12px rgba(46,125,50,.22); }
+
+.btn-warning {
+    background: linear-gradient(135deg, var(--shc-gold), var(--shc-gold-600));
+    border: none; color: var(--shc-navy-700);
+    box-shadow: 0 4px 14px rgba(224,169,44,.35);
+}
+.btn-warning:hover { filter: brightness(1.05); color: var(--shc-navy-700); }
+.btn-outline-light:hover { color: var(--shc-navy); }
+.btn-outline-primary { color: var(--shc-navy) !important; border-color: var(--shc-navy) !important; }
+.btn-outline-primary:hover { background: var(--shc-navy) !important; color: #fff !important; }
+
+/* ---------- Forms ---------- */
+.form-control, .form-select {
+    border-radius: .55rem;
+    border: 1px solid #d8e0ec;
+    padding: .55rem .8rem;
+    background-color: #fbfcfe;
+    transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+}
+.form-control:focus, .form-select:focus {
+    border-color: var(--shc-navy-600);
+    box-shadow: 0 0 0 .2rem rgba(46,90,163,.18);
+    background-color: #fff;
+}
+.form-control::placeholder { color: #9aa6b8; }
+.form-label { color: var(--shc-ink); }
+.form-check-input:checked { background-color: var(--shc-navy); border-color: var(--shc-navy); }
+
+/* Register role radios read nicer as selectable chips */
+.form-check-input:focus { box-shadow: 0 0 0 .2rem rgba(46,90,163,.18); }
+
+/* ---------- Tables ---------- */
+.table { --bs-table-bg: transparent; margin-bottom: 0; }
+.table thead th {
+    color: var(--shc-muted);
+    font-size: .72rem;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--shc-border);
+    padding-bottom: .6rem;
+}
+.table tbody td { padding-top: .7rem; padding-bottom: .7rem; border-color: #eef2f8; vertical-align: middle; }
+.table tbody tr { transition: background-color .12s ease; }
+.table tbody tr:hover { background-color: var(--shc-navy-050); }
+
+/* ---------- List groups ---------- */
+.list-group-item { border-color: #eef2f8; }
+
+/* ---------- Alerts ---------- */
+.alert { border: 1px solid transparent; border-radius: var(--shc-radius-sm); }
+.alert-info { background: #eaf2fd; border-color: #d3e3fb; color: #1b3a63; }
+.alert-warning { background: #fff6e0; border-color: #ffe6ac; color: #7a5300; }
+.alert-danger { background: #fdeceb; border-color: #f7cfcc; color: #8f2b21; }
+.alert-secondary { background: #f1f3f7; border-color: #e2e6ee; color: #3f4a5c; }
+
+/* Demo-notice partial callout */
+.alert.alert-info[style*="border-left"] { border-left: 4px solid var(--shc-navy) !important; }
+
+/* ---------- Footer ---------- */
+footer.border-top {
+    border-top: 1px solid var(--shc-border) !important;
+    background: #fff;
+    margin-top: 2rem;
+}
+
+/* ---------- Small niceties ---------- */
+code { color: var(--shc-purple); background: #f3eef6; padding: .1rem .35rem; border-radius: .3rem; }
+pre code { background: none; padding: 0; }
+::selection { background: rgba(245,194,67,.45); }
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .shc-card, .btn, .table tbody tr { transition: none; }
+    .shc-card:hover { transform: none; }
+}

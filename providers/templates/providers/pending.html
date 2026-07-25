@@ -1,0 +1,39 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Verification Pending &middot; Smart Health Companion{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar_provider.html' with active='pending' %}{% endblock %}
+{% block topbar_initials %}AN{% endblock %}
+{% block topbar_name %}Provider{% endblock %}
+{% block topbar_sub %}Verification pending{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Provider</span>
+        <h1>Account pending verification</h1>
+        <div class="page-sub">Submitted on {{ submitted_on }}. An administrator reviews every provider submission before the listing goes live. You'll be notified once it's approved.</div>
+      </div>
+
+      <div class="grid g-7-5">
+        <div class="panel"><div class="p-body tall" style="text-align:center;padding:34px 24px;">
+          <div class="shc-status-ic" style="width:76px;height:76px;border-radius:22px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;background:#fef3e2;color:#d97706;">
+            <svg class="ic" style="width:34px;height:34px;"><use href="#i-clock"/></svg>
+          </div>
+          <div style="font-size:18px;font-weight:800;margin-bottom:6px;">Review in progress</div>
+          <p style="color:var(--muted);font-size:14px;max-width:420px;margin:0 auto;">Most submissions are reviewed within 1&ndash;2 business days. No action is needed from you right now.</p>
+          <span class="pill warn" style="margin-top:16px;"><svg class="ic" style="width:13px;height:13px;"><use href="#i-clock"/></svg> Awaiting admin approval</span>
+        </div></div>
+
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-file-text"/></svg> Documents submitted</h3>
+          {% for d in documents %}
+          <div class="lrow" style="border-radius:12px;">
+            <span class="ri tint-green" style="width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:0 0 38px;"><svg class="ic"><use href="#i-check"/></svg></span>
+            <div class="grow"><div class="t">{{ d }}</div></div>
+            <span class="pill ok">Received</span>
+          </div>
+          {% endfor %}
+          <div class="callout muted" style="margin-top:14px;margin-bottom:0;"><svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">In the real system, admins review submissions through Django's built-in admin panel &mdash; no custom approval screen needed.</div></div>
+        </div></div>
+      </div>
+
+{% endblock %}

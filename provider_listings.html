@@ -1,0 +1,73 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Listings · Smart Health Companion</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+<link href="shc.css" rel="stylesheet">
+<style>.dow{display:grid;grid-template-columns:70px repeat(7,1fr);gap:6px}.slot{border:1px solid var(--line);border-radius:8px;text-align:center;padding:8px 4px;font-size:.78rem;font-weight:600}.slot.on{background:#e3f5ee;color:#12805c;border-color:#bde6d6}.slot.off{background:#f6f7fa;color:#aab2c0}.dowh{font-size:.72rem;color:var(--muted);text-align:center;font-weight:700;text-transform:uppercase;padding:4px 0}</style>
+</head><body><div class="app">
+<aside class="sidebar" id="sb">
+  <div class="brand"><span class="logo"><i class="bi bi-heart-pulse-fill"></i></span> Smart Health</div>
+  <div class="nav-section">Menu</div>
+  <a class="nav-link2" href="provider_dashboard.html"><i class="bi bi-grid-1x2-fill"></i> Dashboard</a>
+  <a class="nav-link2" href="provider_appointments.html"><i class="bi bi-calendar-check"></i> Appointments</a>
+  <a class="nav-link2" href="provider_consult.html"><i class="bi bi-file-medical"></i> Consultations</a>
+  <a class="nav-link2 active" href="provider_listings.html"><i class="bi bi-list-check"></i> Listings</a>
+  <a class="nav-link2" href="provider_profile_verification.html"><i class="bi bi-patch-check"></i> Profile &amp; Verification</a>
+  <a class="nav-link2" href="provider_announcements.html"><i class="bi bi-megaphone"></i> Announcements</a>
+  <div class="role-badge"><span class="av">A</span><div><div style="font-weight:600">Dr. A. Nair</div><div style="color:#9db4de;font-size:.78rem">Healthcare Provider</div></div></div>
+</aside>
+<div class="main">
+  <div class="topbar">
+    <button class="icon-btn hamburger" onclick="document.getElementById('sb').classList.toggle('show')"><i class="bi bi-list"></i></button>
+    <div class="search"><i class="bi bi-search"></i><input placeholder="Search…"></div>
+    <button class="icon-btn"><i class="bi bi-bell"></i><span class="dot"></span></button>
+    <button class="icon-btn"><i class="bi bi-person"></i></button>
+  </div>
+  <div class="content">
+    <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
+      <div><h1 class="page-title">Service listings</h1><p class="subtle mb-0">Services patients can book with you</p></div>
+      <button class="btn-navy"><i class="bi bi-plus-lg me-1"></i> Add service</button>
+    </div>
+
+    <div class="row g-3 mb-1">
+      <div class="col-md-4"><div class="card2"><div class="bd">
+        <div class="d-flex align-items-start justify-content-between"><div class="chip tint-navy" style="width:46px;height:46px;border-radius:12px;display:grid;place-items:center;font-size:1.3rem"><i class="bi bi-camera-video"></i></div><label class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" checked></label></div>
+        <div class="mt-3" style="font-weight:700;font-size:1.05rem">Consultation</div>
+        <div class="big-read" style="font-size:1.6rem">₹500 <span class="subtle" style="font-size:.85rem">/ 30 min</span></div>
+        <p class="subtle mt-1 mb-3" style="font-size:.85rem">In-clinic or teleconsult · new patients</p>
+        <div class="d-flex gap-2 align-items-center"><span class="pill ok"><i class="bi bi-check-circle"></i> Available</span><button class="btn-soft ms-auto"><i class="bi bi-pencil me-1"></i>Edit</button></div>
+      </div></div></div>
+
+      <div class="col-md-4"><div class="card2"><div class="bd">
+        <div class="d-flex align-items-start justify-content-between"><div class="chip tint-teal" style="width:46px;height:46px;border-radius:12px;display:grid;place-items:center;font-size:1.3rem"><i class="bi bi-arrow-repeat"></i></div><label class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" checked></label></div>
+        <div class="mt-3" style="font-weight:700;font-size:1.05rem">Follow-up</div>
+        <div class="big-read" style="font-size:1.6rem">₹300 <span class="subtle" style="font-size:.85rem">/ 15 min</span></div>
+        <p class="subtle mt-1 mb-3" style="font-size:.85rem">For existing patients · review visit</p>
+        <div class="d-flex gap-2 align-items-center"><span class="pill ok"><i class="bi bi-check-circle"></i> Available</span><button class="btn-soft ms-auto"><i class="bi bi-pencil me-1"></i>Edit</button></div>
+      </div></div></div>
+
+      <div class="col-md-4"><div class="card2"><div class="bd">
+        <div class="d-flex align-items-start justify-content-between"><div class="chip tint-gold" style="width:46px;height:46px;border-radius:12px;display:grid;place-items:center;font-size:1.3rem"><i class="bi bi-telephone"></i></div><label class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox"></label></div>
+        <div class="mt-3" style="font-weight:700;font-size:1.05rem">Teleconsult</div>
+        <div class="big-read" style="font-size:1.6rem">₹400 <span class="subtle" style="font-size:.85rem">/ 20 min</span></div>
+        <p class="subtle mt-1 mb-3" style="font-size:.85rem">Video / phone consultation</p>
+        <div class="d-flex gap-2 align-items-center"><span class="pill muted"><i class="bi bi-pause-circle"></i> Paused</span><button class="btn-soft ms-auto"><i class="bi bi-pencil me-1"></i>Edit</button></div>
+      </div></div></div>
+    </div>
+
+    <div class="card2 mt-3">
+      <div class="hd"><h5>Weekly availability</h5><button class="btn-soft"><i class="bi bi-pencil me-1"></i>Edit slots</button></div>
+      <div class="bd">
+        <div class="dow mb-2"><div></div><div class="dowh">Mon</div><div class="dowh">Tue</div><div class="dowh">Wed</div><div class="dowh">Thu</div><div class="dowh">Fri</div><div class="dowh">Sat</div><div class="dowh">Sun</div></div>
+        <div class="dow mb-2"><div class="dowh" style="text-align:right;padding-right:8px">Morning</div><div class="slot on">9–1</div><div class="slot on">9–1</div><div class="slot on">9–1</div><div class="slot on">9–1</div><div class="slot on">9–1</div><div class="slot on">9–12</div><div class="slot off">—</div></div>
+        <div class="dow"><div class="dowh" style="text-align:right;padding-right:8px">Evening</div><div class="slot on">3–6</div><div class="slot off">—</div><div class="slot on">3–6</div><div class="slot on">3–6</div><div class="slot on">3–6</div><div class="slot off">—</div><div class="slot off">—</div></div>
+        <p class="subtle mt-3 mb-0" style="font-size:.82rem"><i class="bi bi-info-circle me-1"></i>Green slots are open for booking. Paused services won't show even in open slots.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</body></html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Log Activity · Smart Health Companion</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+<link href="shc.css" rel="stylesheet">
+<style>.ex{display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid var(--line)}.ex:last-child{border-bottom:none}.ex input[type=checkbox]{width:20px;height:20px}</style>
+</head><body><div class="app">
+<aside class="sidebar" id="sb">
+  <div class="brand"><span class="logo"><i class="bi bi-heart-pulse-fill"></i></span> Smart Health</div>
+  <div class="nav-section">Menu</div>
+  <a class="nav-link2" href="provider_dashboard.html"><i class="bi bi-grid-1x2-fill"></i> Dashboard</a>
+  <a class="nav-link2" href="wellness_clients.html"><i class="bi bi-people"></i> Clients</a>
+  <a class="nav-link2 active" href="wellness_log_activity.html"><i class="bi bi-clipboard-check"></i> Log Activity</a>
+  <a class="nav-link2" href="provider_listings.html"><i class="bi bi-list-check"></i> Listings</a>
+  <a class="nav-link2" href="provider_profile_verification.html"><i class="bi bi-patch-check"></i> Profile &amp; Verification</a>
+  <div class="role-badge"><span class="av">F</span><div><div style="font-weight:600">FitLife Centre</div><div style="color:#9db4de;font-size:.78rem">Wellness Provider</div></div></div>
+</aside>
+<div class="main">
+  <div class="topbar">
+    <button class="icon-btn hamburger" onclick="document.getElementById('sb').classList.toggle('show')"><i class="bi bi-list"></i></button>
+    <div class="search"><i class="bi bi-search"></i><input placeholder="Search…"></div>
+    <button class="icon-btn"><i class="bi bi-bell"></i><span class="dot"></span></button>
+    <button class="icon-btn"><i class="bi bi-person"></i></button>
+  </div>
+  <div class="content">
+    <div class="mb-3"><h1 class="page-title">Log activity</h1><p class="subtle mb-0">Record a completed session against a client's plan</p></div>
+
+    <div class="mb-3">
+      <div class="form-lbl">Select client</div>
+      <div class="d-flex gap-2 flex-wrap">
+        <span class="chip-f active"><i class="bi bi-person me-1"></i>Latha R.</span>
+        <span class="chip-f"><i class="bi bi-person me-1"></i>Arjun P.</span>
+        <span class="chip-f"><i class="bi bi-person me-1"></i>Kavya S.</span>
+      </div>
+    </div>
+
+    <div class="banner warn mb-3"><i class="bi bi-exclamation-triangle-fill"></i><div><strong>Safety flag (shared by client):</strong> Hypertension — avoid high-intensity training. Keep intensity moderate and allow rest between sets.</div></div>
+
+    <div class="row g-3">
+      <div class="col-lg-7">
+        <div class="card2">
+          <div class="hd"><h5>Session details · Beginner Strength</h5><span class="pill info">Session 10 of 15</span></div>
+          <div class="bd">
+            <div class="d-flex align-items-center justify-content-between p-2 mb-3" style="border:1px solid var(--line);border-radius:10px">
+              <div><div style="font-weight:600">Attendance</div><div class="subtle" style="font-size:.82rem">Mark whether the client attended</div></div>
+              <label class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" checked></label>
+            </div>
+            <div class="row g-2 mb-3">
+              <div class="col-6"><div class="form-lbl">Date</div><input type="date" class="inp" value="2026-07-24"></div>
+              <div class="col-6"><div class="form-lbl">Duration (min)</div><input class="inp" value="45"></div>
+              <div class="col-6"><div class="form-lbl">Intensity</div><select class="inp"><option>Light</option><option selected>Moderate</option><option disabled>High (flagged — avoid)</option></select></div>
+              <div class="col-6"><div class="form-lbl">Focus area</div><input class="inp" value="Lower body + core"></div>
+            </div>
+            <div class="form-lbl">Trainer note</div>
+            <textarea class="inp" rows="3" placeholder="How the session went, form cues, how the client felt…">Kept intensity moderate per safety flag. Good progress on squats; added light resistance band.</textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-5">
+        <div class="card2">
+          <div class="hd"><h5>Plan checklist</h5><span class="pill muted">Mark complete</span></div>
+          <div class="bd">
+            <div class="row2" style="border:none;padding:0"><div class="w-100">
+              <label class="ex"><input type="checkbox" checked><div class="info"><div class="n">Warm-up &amp; mobility · 5 min</div></div></label>
+              <label class="ex"><input type="checkbox" checked><div class="info"><div class="n">Bodyweight squats · 3×10</div></div></label>
+              <label class="ex"><input type="checkbox" checked><div class="info"><div class="n">Resistance band rows · 3×12</div></div></label>
+              <label class="ex"><input type="checkbox"><div class="info"><div class="n">Wall push-ups · 3×8</div></div></label>
+              <label class="ex"><input type="checkbox"><div class="info"><div class="n">Core: dead bug · 2×10</div></div></label>
+              <label class="ex"><input type="checkbox" checked><div class="info"><div class="n">Cool-down stretches · 5 min</div></div></label>
+            </div></div>
+            <button class="btn-navy w-100 mt-3"><i class="bi bi-save me-1"></i>Save session</button>
+            <div class="banner info mt-3" style="font-size:.82rem"><i class="bi bi-arrow-right-circle"></i><div>This flows into the client's <strong>lifestyle dashboard</strong> as a completed fitness session.</div></div>
+            <p class="subtle mt-3 mb-0" style="font-size:.78rem"><i class="bi bi-shield-lock me-1"></i>Wellness partners log only fitness data — no medications, prescriptions or clinical records are involved.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</body></html>

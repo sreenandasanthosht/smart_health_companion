@@ -1,0 +1,23 @@
+[
+  {"full_name": "Dr. Anjali Nair", "specialty": "General Physician", "experience_years": 12, "qualification": "MBBS, MD (Internal Medicine)", "verification_status": "approved"},
+  {"full_name": "Dr. Rohan Mehta", "specialty": "Cardiologist", "experience_years": 15, "qualification": "MBBS, DM (Cardiology)", "verification_status": "approved"},
+  {"full_name": "Dr. Priya Suresh", "specialty": "Endocrinologist", "experience_years": 9, "qualification": "MBBS, MD (Endocrinology)", "verification_status": "approved"},
+  {"full_name": "Dr. Kevin George", "specialty": "Psychiatrist", "experience_years": 7, "qualification": "MBBS, MD (Psychiatry)", "verification_status": "approved"},
+  {"full_name": "Dr. Fathima Rasheed", "specialty": "Dermatologist", "experience_years": 6, "qualification": "MBBS, MD (Dermatology)", "verification_status": "approved"},
+  {"full_name": "Dr. Sanjay Iyer", "specialty": "Orthopedic Surgeon", "experience_years": 18, "qualification": "MBBS, MS (Orthopedics)", "verification_status": "approved"},
+  {"full_name": "Dr. Meera Pillai", "specialty": "Gynecologist", "experience_years": 11, "qualification": "MBBS, MD (Obstetrics & Gynecology)", "verification_status": "approved"},
+  {"full_name": "Dr. Arjun Krishnan", "specialty": "Pulmonologist", "experience_years": 10, "qualification": "MBBS, MD (Pulmonary Medicine)", "verification_status": "approved"},
+  {"full_name": "Dr. Divya Menon", "specialty": "Pediatrician", "experience_years": 8, "qualification": "MBBS, MD (Pediatrics)", "verification_status": "approved"},
+  {"full_name": "Dr. Thomas Varghese", "specialty": "Nephrologist", "experience_years": 14, "qualification": "MBBS, DM (Nephrology)", "verification_status": "approved"},
+  {"full_name": "Dr. Nisha Kurian", "specialty": "General Physician", "experience_years": 5, "qualification": "MBBS, MD (General Medicine)", "verification_status": "approved"},
+  {"full_name": "Dr. Vikram Rao", "specialty": "Neurologist", "experience_years": 13, "qualification": "MBBS, DM (Neurology)", "verification_status": "approved"},
+  {"full_name": "Dr. Lakshmi Warrier", "specialty": "Rheumatologist", "experience_years": 9, "qualification": "MBBS, MD (Rheumatology)", "verification_status": "approved"},
+  {"full_name": "Dr. Sandeep Joseph", "specialty": "Gastroenterologist", "experience_years": 16, "qualification": "MBBS, DM (Gastroenterology)", "verification_status": "approved"},
+  {"full_name": "Dr. Ritu Chandran", "specialty": "Ophthalmologist", "experience_years": 7, "qualification": "MBBS, MS (Ophthalmology)", "verification_status": "approved"},
+  {"full_name": "Dr. Ashwin Balakrishnan", "specialty": "ENT Specialist", "experience_years": 10, "qualification": "MBBS, MS (ENT)", "verification_status": "approved"},
+  {"full_name": "Dr. Neha Thomas", "specialty": "Diabetologist", "experience_years": 8, "qualification": "MBBS, MD (Diabetology)", "verification_status": "approved"},
+  {"full_name": "Dr. Manoj Pillai", "specialty": "Urologist", "experience_years": 12, "qualification": "MBBS, MCh (Urology)", "verification_status": "approved"},
+  {"full_name": "Dr. Aparna Ravi", "specialty": "General Physician", "experience_years": 3, "qualification": "MBBS", "verification_status": "pending"},
+  {"full_name": "Dr. Gautam Nambiar", "specialty": "Cardiologist", "experience_years": 2, "qualification": "MBBS, MD (Internal Medicine)", "verification_status": "pending"},
+  {"full_name": "Dr. Sneha Abraham", "specialty": "Psychiatrist", "experience_years": 4, "qualification": "MBBS, MD (Psychiatry)", "verification_status": "pending"}
+]
