@@ -8,17 +8,18 @@ Built with **Django** (Python) using the **MVT** architecture and **MySQL**.
 ```
 smart_health_companion/
 ├── manage.py            # command tool
-├── config/              # project settings + top-level URLs
-├── accounts/            # app: users, roles, unique id, login
-├── health/              # app: vitals, medications, lifestyle, mental health
-├── providers/           # app: listings, appointments, notes
-├── core/                # app: home page + dashboards (the dummy page lives here)
-├── templates/base.html  # shared Bootstrap layout
-└── static/              # CSS / JS / images
+├── config/               # project settings + top-level URLs
+├── accounts/             # app: users, roles, unique id, login
+├── health/                # app: vitals, medications, lifestyle, mental health
+├── providers/             # app: listings, appointments, notes
+├── core/                  # app: home page + dashboards (the dummy page lives here)
+├── adminpanel/            # app: platform Admin dashboard, verification, users, providers, audit log
+├── templates/base.html    # shared Bootstrap layout
+└── static/                # CSS / JS / images
 ```
 
-One **project** (`smart_health_companion`), four **apps** (`accounts`, `health`,
-`providers`, `core`). In Django an "app" is a feature-module, not the whole site.
+One **project** (`smart_health_companion`), five **apps** (`accounts`, `health`,
+`providers`, `core`, `adminpanel`). In Django an "app" is a feature-module, not the whole site.
 
 ## Quick start (short version — full steps in SETUP_GUIDE.md)
 
@@ -45,5 +46,6 @@ python manage.py createsuperuser
 # 6. run it
 python manage.py runserver
 # open http://127.0.0.1:8000/  -> you should see the dummy home page
-# admin panel: http://127.0.0.1:8000/admin/
+# Django admin panel (developer tool): http://127.0.0.1:8000/admin/
+# App's own Admin dashboard (a real app feature): http://127.0.0.1:8000/admin-panel/dashboard/
 ```

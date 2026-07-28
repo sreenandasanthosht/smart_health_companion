@@ -14,6 +14,7 @@ class User(AbstractUser):
         PATIENT = 'PATIENT', 'Patient'
         CAREGIVER = 'CAREGIVER', 'Caregiver'
         PROVIDER = 'PROVIDER', 'Provider'
+        ADMIN = 'ADMIN', 'Admin'
 
     role = models.CharField(
         max_length=20, choices=Role.choices, default=Role.PATIENT

@@ -1,0 +1,50 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Users &middot; Smart Health Companion{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar_admin.html' with active='users' %}{% endblock %}
+{% block topbar_initials %}A{% endblock %}
+{% block topbar_name %}Admin{% endblock %}
+{% block topbar_sub %}Administrator{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Admin</span>
+        <h1>Users</h1>
+        <div class="page-sub">Every registered account on the platform, across all roles.</div>
+      </div>
+
+      <div class="callout info">
+        <svg class="ic"><use href="#i-sparkles"/></svg>
+        <div class="c-body"><strong>Prototype page.</strong> Suspend and reactivate actions are disabled in this preview.</div>
+      </div>
+
+      <div class="panel"><div class="p-body tall">
+        <h3 class="p-h"><svg class="ic"><use href="#i-users"/></svg> All users</h3>
+        <table class="dtable">
+          <thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Joined</th><th>Last active</th><th>Actions</th></tr></thead>
+          <tbody>
+            {% for u in users %}
+            <tr>
+              <td><div style="font-weight:700;">{{ u.name }}</div><div class="s" style="color:var(--muted);font-size:12.5px;">{{ u.email }}</div></td>
+              <td>{{ u.role }}</td>
+              <td>
+                {% if u.status == 'active' %}<span class="pill ok">Active</span>
+                {% elif u.status == 'pending' %}<span class="pill warn">Pending</span>
+                {% else %}<span class="pill danger">Suspended</span>{% endif %}
+              </td>
+              <td>{{ u.joined }}</td>
+              <td>{{ u.last_active }}</td>
+              <td>
+                {% if u.status == 'suspended' %}
+                <button type="button" class="btn btn-ghost is-disabled" style="padding:7px 12px;font-size:12.5px;" disabled>Reactivate</button>
+                {% else %}
+                <button type="button" class="btn btn-danger-ghost is-disabled" style="padding:7px 12px;font-size:12.5px;" disabled>Suspend</button>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div></div>
+
+{% endblock %}

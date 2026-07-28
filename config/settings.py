@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'health',
     'providers',
     'core',
+    'adminpanel',
 ]
 
 MIDDLEWARE = [

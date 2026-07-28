@@ -1,0 +1,54 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Provider Verification &middot; Smart Health Companion{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar_admin.html' with active='verification' %}{% endblock %}
+{% block topbar_initials %}A{% endblock %}
+{% block topbar_name %}Admin{% endblock %}
+{% block topbar_sub %}Administrator{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Admin</span>
+        <h1>Provider Verification Queue</h1>
+        <div class="page-sub">Review submitted credentials before providers go live on the platform.</div>
+      </div>
+
+      <div class="callout info">
+        <svg class="ic"><use href="#i-sparkles"/></svg>
+        <div class="c-body"><strong>Prototype page.</strong> Approve and reject actions are disabled in this preview.</div>
+      </div>
+
+      <div class="panel"><div class="p-body tall">
+        <h3 class="p-h"><svg class="ic"><use href="#i-shield-alert"/></svg> Submissions</h3>
+        <table class="dtable">
+          <thead><tr><th>Provider</th><th>Type</th><th>Submitted</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>
+            {% for p in queue %}
+            <tr>
+              <td><div style="font-weight:700;">{{ p.name }}</div><div class="s" style="color:var(--muted);font-size:12.5px;">{{ p.meta }}</div></td>
+              <td>{{ p.type }}</td>
+              <td>{{ p.submitted }}</td>
+              <td>
+                {% if p.status == 'pending' %}<span class="pill warn">Pending</span>
+                {% elif p.status == 'approved' %}<span class="pill ok">Approved</span>
+                {% else %}<span class="pill danger">Rejected</span>{% endif %}
+              </td>
+              <td>
+                {% if p.status == 'pending' %}
+                <div style="display:flex;gap:8px;">
+                  <button type="button" class="btn btn-green is-disabled" style="padding:7px 12px;font-size:12.5px;" disabled>Approve</button>
+                  <button type="button" class="btn btn-danger-ghost is-disabled" style="padding:7px 12px;font-size:12.5px;" disabled>Reject</button>
+                </div>
+                {% else %}
+                <button type="button" class="btn btn-ghost is-disabled" style="padding:7px 12px;font-size:12.5px;" disabled>View</button>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" style="color:var(--muted);">No submissions yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div></div>
+
+{% endblock %}
