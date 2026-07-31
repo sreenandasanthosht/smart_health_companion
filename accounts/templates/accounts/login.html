@@ -1,22 +1,30 @@
 {% extends 'base_auth.html' %}
-{% block title %}Log in &middot; Smart Health Companion{% endblock %}
+{% block title %}Log in &middot; CareNest{% endblock %}
 {% block side_title %}Welcome back.{% endblock %}
-{% block side_text %}Log in to reach your role-specific dashboard &mdash; patient, caregiver or provider.{% endblock %}
+{% block side_text %}Log in to reach your dashboard &mdash; patient, caregiver, provider, nurse or admin.{% endblock %}
 
 {% block auth_content %}
       <h1 class="a-title">Log in to your account</h1>
       <p class="a-sub">Enter your details to continue to your dashboard.</p>
 
-      <div class="callout info">
-        <svg class="ic"><use href="#i-sparkles"/></svg>
-        <div class="c-body"><strong>Prototype.</strong> Sign-in isn't connected to real accounts yet &mdash; submitting takes you straight to the patient dashboard preview.</div>
+      {% if form.non_field_errors %}
+      <div class="callout danger">
+        <svg class="ic"><use href="#i-shield-alert"/></svg>
+        <div class="c-body">{% for error in form.non_field_errors %}{{ error }}{% endfor %}</div>
       </div>
+      {% endif %}
+
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
 
       <div class="panel"><div class="p-body" style="padding:24px;">
         <form method="post" novalidate>
           {% csrf_token %}
-          <div class="field"><label>{{ form.email.label }}</label>{{ form.email }}</div>
-          <div class="field"><label>{{ form.password.label }}</label>{{ form.password }}</div>
+          <div class="field"><label>Email</label>{{ form.email }}{{ form.email.errors }}</div>
+          <div class="field"><label>Password</label>{{ form.password }}{{ form.password.errors }}</div>
           <button type="submit" class="btn btn-teal block" style="margin-top:4px;">Log in</button>
         </form>
       </div></div>

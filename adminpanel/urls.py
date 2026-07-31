@@ -1,5 +1,9 @@
-"""URL map for the adminpanel app (the platform Admin's own dashboard)."""
+"""
+URL map for the adminpanel app -- the platform Admin's own dashboard.
+Note this is NOT Django's built-in /admin/ site; these are app pages.
+"""
 from django.urls import path
+
 from . import views
 
 urlpatterns = [
@@ -8,4 +12,5 @@ urlpatterns = [
     path('users/', views.users, name='admin_users'),
     path('providers/', views.providers, name='admin_providers'),
     path('audit-log/', views.audit_log, name='admin_audit_log'),
+    path('nursing/', views.nursing, name='admin_nursing'),
 ]

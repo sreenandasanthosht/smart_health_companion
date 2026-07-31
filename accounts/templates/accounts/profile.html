@@ -1,0 +1,87 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}My Profile &middot; CareNest{% endblock %}
+{% block sidebar %}
+{% if user.role == 'PROVIDER' %}{% include 'partials/_sidebar_provider.html' with active='profile' %}
+{% elif user.role == 'CAREGIVER' %}{% include 'partials/_sidebar_caregiver.html' with active='profile' %}
+{% elif user.role == 'NURSE' %}{% include 'partials/_sidebar_nurse.html' with active='profile' %}
+{% elif user.role == 'ADMIN' %}{% include 'partials/_sidebar_admin.html' with active='profile' %}
+{% else %}{% include 'partials/_sidebar.html' with active='profile' %}{% endif %}
+{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">{{ user.get_role_display }}</span>
+        <h1>My profile</h1>
+        <div class="page-sub">Your CareNest ID is <strong>{{ user_obj.unique_id }}</strong>.</div>
+      </div>
+
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
+
+      <div class="grid g-7-5">
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-user"/></svg> Your details</h3>
+          <form method="post">
+            {% csrf_token %}
+            <div class="grid g-2" style="gap:14px;">
+              <div class="field"><label>First name</label>
+                <input type="text" name="first_name" class="inp" value="{{ user_obj.first_name }}"></div>
+              <div class="field"><label>Last name</label>
+                <input type="text" name="last_name" class="inp" value="{{ user_obj.last_name }}"></div>
+            </div>
+            <div class="field"><label>Phone number</label>
+              <input type="text" name="phone_number" class="inp" value="{{ user_obj.phone_number }}" placeholder="+91 98765 43210"></div>
+            <div class="grid g-2" style="gap:14px;">
+              <div class="field"><label>Date of birth</label>
+                <input type="date" name="date_of_birth" class="inp" value="{{ user_obj.date_of_birth|date:'Y-m-d' }}"></div>
+              <div class="field"><label>Sex</label>
+                <select name="sex" class="inp">
+                  <option value="">Prefer not to say</option>
+                  {% for value, label in sex_choices %}
+                  <option value="{{ value }}" {% if user_obj.sex == value %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select></div>
+            </div>
+            <div class="grid g-2" style="gap:14px;">
+              <div class="field"><label>Blood group</label>
+                <input type="text" name="blood_group" class="inp" value="{{ user_obj.blood_group }}" placeholder="e.g. O+"></div>
+              <div class="field"><label>Height (cm)</label>
+                <input type="number" name="height_cm" class="inp" value="{{ user_obj.height_cm|default_if_none:'' }}" placeholder="e.g. 165"></div>
+            </div>
+            <div class="field"><label>Address</label>
+              <input type="text" name="address" class="inp" value="{{ user_obj.address }}"></div>
+            <div class="field"><label>Emergency contact</label>
+              <input type="text" name="emergency_contact" class="inp" value="{{ user_obj.emergency_contact }}" placeholder="Phone number"></div>
+            <button type="submit" class="btn btn-teal block">Save profile</button>
+          </form>
+        </div></div>
+
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-target"/></svg> Profile completion</h3>
+          <div class="goal">
+            <div class="g-top"><span class="g-name">Complete</span><span class="g-val">{{ completion }}%</span></div>
+            <div class="bar"><span style="width:{{ completion }}%;background:{% if completion == 100 %}#22c55e{% else %}#f59e0b{% endif %};"></span></div>
+          </div>
+          {% if missing %}
+          <p style="color:var(--muted);font-size:13.5px;margin-top:14px;">Still to add:</p>
+          {% for m in missing %}
+          <div class="kv"><span class="k">{{ m }}</span><span class="v"><span class="pill muted">Missing</span></span></div>
+          {% endfor %}
+          {% else %}
+          <div class="callout mint" style="margin-top:14px;margin-bottom:0;">
+            <svg class="ic"><use href="#i-check"/></svg>
+            <div class="c-body">Your profile is complete.</div></div>
+          {% endif %}
+
+          <h3 class="p-h" style="margin-top:20px;"><svg class="ic"><use href="#i-shield-alert"/></svg> Account</h3>
+          <div class="kv"><span class="k">Email</span><span class="v">{{ user_obj.email }}</span></div>
+          <div class="kv"><span class="k">Role</span><span class="v">{{ user_obj.get_role_display }}</span></div>
+          <div class="kv"><span class="k">Joined</span><span class="v">{{ user_obj.date_joined|date:"j M Y" }}</span></div>
+        </div></div>
+      </div>
+
+{% endblock %}

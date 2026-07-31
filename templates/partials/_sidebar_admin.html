@@ -3,7 +3,7 @@
       <span class="logo">
         <svg viewBox="0 0 24 24" width="24" height="24" fill="#fff"><path d="M12 21s-6.8-4.4-9.3-8.7C.9 8.9 2.7 4.8 6.7 4.8c2.1 0 3.6 1.3 5.3 3.4 1.7-2.1 3.2-3.4 5.3-3.4 4 0 5.8 4.1 4 7.5C18.8 16.6 12 21 12 21z"/><path d="M3.4 12.2H7l1.4-2.5 2.4 5 1.5-2.5h3.4" stroke="#0d9488" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
-      <span class="name">Smart Health<br>Companion</span>
+      <span class="name">CareNest</span>
     </div>
 
     <nav class="nav">
@@ -11,17 +11,19 @@
       <a class="nav-item {% if active == 'verification' %}active{% endif %}" href="{% url 'admin_verification' %}"><svg class="ic"><use href="#i-shield-alert"/></svg> Provider Verification</a>
       <a class="nav-item {% if active == 'users' %}active{% endif %}" href="{% url 'admin_users' %}"><svg class="ic"><use href="#i-users"/></svg> Users</a>
       <a class="nav-item {% if active == 'providers' %}active{% endif %}" href="{% url 'admin_providers' %}"><svg class="ic"><use href="#i-stethoscope"/></svg> Providers</a>
+      <a class="nav-item {% if active == 'nursing' %}active{% endif %}" href="{% url 'admin_nursing' %}"><svg class="ic"><use href="#i-heart"/></svg> Nursing</a>
       <a class="nav-item {% if active == 'audit' %}active{% endif %}" href="{% url 'admin_audit_log' %}"><svg class="ic"><use href="#i-clock"/></svg> Audit Log</a>
       <div class="nav-sep"></div>
       <a class="nav-item emergency" href="#"><svg class="ic"><use href="#i-shield-alert"/></svg>
         <span>Emergency<span class="sub">Quick help in an emergency</span></span></a>
+      <a class="nav-item" href="{% url 'logout' %}"><svg class="ic"><use href="#i-log-out"/></svg> Log out</a>
     </nav>
 
     <div class="journey">
       <div class="journey-head"><b>Platform at a glance</b></div>
-      <div class="step"><span class="dot pending"></span><div><div class="t">7 verifications</div><div class="s">Awaiting review</div></div></div>
-      <div class="step"><span class="dot pending"></span><div><div class="t">3 support tickets</div><div class="s">Under 24h SLA</div></div></div>
-      <div class="step"><span class="dot done"><svg class="ic"><use href="#i-check"/></svg></span><div><div class="t">3,240 users</div><div class="s">Platform-wide</div></div></div>
+      <div class="step"><span class="dot {% if stat_pending_verifications %}pending{% else %}done{% endif %}">{% if not stat_pending_verifications %}<svg class="ic"><use href="#i-check"/></svg>{% endif %}</span><div><div class="t">{{ stat_pending_verifications|default:"0" }} verification{{ stat_pending_verifications|pluralize }}</div><div class="s">Awaiting review</div></div></div>
+      <div class="step"><span class="dot {% if stat_escalations %}pending{% else %}done{% endif %}">{% if not stat_escalations %}<svg class="ic"><use href="#i-check"/></svg>{% endif %}</span><div><div class="t">{{ stat_escalations|default:"0" }} escalation{{ stat_escalations|pluralize }}</div><div class="s">Raised by nurses</div></div></div>
+      <div class="step"><span class="dot done"><svg class="ic"><use href="#i-check"/></svg></span><div><div class="t">{{ stat_total_users|default:"0" }} user{{ stat_total_users|pluralize }}</div><div class="s">Platform-wide</div></div></div>
       <svg class="plant" viewBox="0 0 80 80" fill="none">
         <path d="M40 62c0-12-7-19-16-22 8-1 15 3 18 9 2-7 9-12 17-11-8 4-14 11-14 24z" fill="#34d399"/>
         <path d="M40 62c0-9 4-16 11-20-5 5-7 11-7 20z" fill="#10b981"/>

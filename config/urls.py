@@ -6,6 +6,7 @@ Top-level URL routing (the "waiter" that maps web addresses to code).
 /health/         -> patient vitals, medications, lifestyle, mental health, sharing, caregiver dashboard
 /providers/      -> provider directory, appointments, provider dashboard
 /admin-panel/    -> the platform Admin's own dashboard (verification, users, providers, audit log)
+/nursing/        -> nurse dashboard, assigned patients, visit logging
 """
 from django.contrib import admin
 from django.urls import path, include
@@ -17,4 +18,5 @@ urlpatterns = [
     path('health/', include('health.urls')),
     path('providers/', include('providers.urls')),
     path('admin-panel/', include('adminpanel.urls')),
+    path('nursing/', include('nursing.urls')),
 ]

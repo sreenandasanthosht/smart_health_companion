@@ -1,21 +1,35 @@
 {% extends 'base_dashboard.html' %}
-{% block title %}Provider Dashboard &middot; Smart Health Companion{% endblock %}
+{% block title %}Provider Dashboard &middot; CareNest{% endblock %}
 {% block sidebar %}{% include 'partials/_sidebar_provider.html' with active='dashboard' %}{% endblock %}
-{% block topbar_initials %}AN{% endblock %}
-{% block topbar_name %}{{ provider_name }}{% endblock %}
-{% block topbar_sub %}Verified provider{% endblock %}
 
 {% block dashboard_content %}
 
       <div class="page-head">
         <span class="chip-role">Provider</span>
-        <h1>Welcome, {{ provider_name }}</h1>
-        <div class="page-sub">Review appointment requests and manage your upcoming visits.</div>
+        <h1>Welcome, {{ profile.display_name }}</h1>
+        <div class="page-sub">{{ profile.specialty|default:profile.get_provider_type_display }} &middot; review requests and manage your visits.</div>
       </div>
 
-      <div class="callout info">
-        <svg class="ic"><use href="#i-sparkles"/></svg>
-        <div class="c-body"><strong>Prototype page.</strong> Accepting, declining and adding notes are disabled in this preview.</div>
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
+
+      <div class="grid stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:22px;">
+        <div class="card stat">
+          <div class="top"><span class="chip orange"><svg class="ic"><use href="#i-calendar-check"/></svg></span><div class="label">Pending requests</div></div>
+          <div class="big">{{ requests|length }}</div>
+        </div>
+        <div class="card stat">
+          <div class="top"><span class="chip blue"><svg class="ic"><use href="#i-calendar-days"/></svg></span><div class="label">Confirmed upcoming</div></div>
+          <div class="big">{{ upcoming|length }}</div>
+        </div>
+        <div class="card stat">
+          <div class="top"><span class="chip green"><svg class="ic"><use href="#i-users"/></svg></span><div class="label">Patients seen</div></div>
+          <div class="big">{{ total_patients }}</div>
+          <div class="meta">{{ completed_count }} completed visit{{ completed_count|pluralize }}</div>
+        </div>
       </div>
 
       <div class="grid g-2">
@@ -24,12 +38,23 @@
           {% for r in requests %}
           <div class="lrow" style="flex-direction:column;align-items:stretch;gap:10px;">
             <div>
-              <div class="t">{{ r.patient }}</div>
-              <div class="s">Requested for {{ r.requested_for }} &middot; {{ r.reason }}</div>
+              <div class="t">{{ r.patient.display_name }}</div>
+              <div class="s">Requested for {{ r.scheduled_for|date:"D, j M Y - g:i A" }}</div>
+              {% if r.reason %}<div class="s">{{ r.reason }}</div>{% endif %}
             </div>
             <div style="display:flex;gap:8px;">
-              <button type="button" class="btn btn-green is-disabled" style="padding:8px 14px;" disabled><svg class="ic"><use href="#i-check"/></svg> Accept</button>
-              <button type="button" class="btn btn-danger-ghost is-disabled" style="padding:8px 14px;" disabled>Decline</button>
+              <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="appointment_id" value="{{ r.id }}">
+                <input type="hidden" name="action" value="accept">
+                <button type="submit" class="btn btn-green" style="padding:8px 14px;"><svg class="ic"><use href="#i-check"/></svg> Accept</button>
+              </form>
+              <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="appointment_id" value="{{ r.id }}">
+                <input type="hidden" name="action" value="decline">
+                <button type="submit" class="btn btn-danger-ghost" style="padding:8px 14px;">Decline</button>
+              </form>
             </div>
           </div>
           {% empty %}
@@ -40,13 +65,26 @@
         <div class="panel"><div class="p-body tall">
           <h3 class="p-h"><svg class="ic"><use href="#i-calendar-days"/></svg> Upcoming appointments</h3>
           {% for u in upcoming %}
-          <div class="lrow">
-            <span class="ri tint-blue" style="width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:0 0 40px;"><svg class="ic"><use href="#i-user"/></svg></span>
-            <div class="grow"><div class="t">{{ u.patient }}</div><div class="s">{{ u.reason }}</div></div>
-            <div style="text-align:right;">
-              <div class="s" style="margin-bottom:6px;">{{ u.when }}</div>
-              <button type="button" class="btn btn-ghost is-disabled" style="padding:6px 12px;font-size:12.5px;" disabled>Add note</button>
+          <div class="lrow" style="flex-direction:column;align-items:stretch;gap:10px;">
+            <div style="display:flex;gap:12px;align-items:center;">
+              <span class="ri tint-blue" style="width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:0 0 40px;">
+                <svg class="ic"><use href="#i-user"/></svg></span>
+              <div class="grow"><div class="t">{{ u.patient.display_name }}</div>
+                <div class="s">{{ u.scheduled_for|date:"D, j M - g:i A" }}{% if u.reason %} &middot; {{ u.reason }}{% endif %}</div></div>
             </div>
+            <form method="post" style="display:flex;gap:8px;align-items:center;">
+              {% csrf_token %}
+              <input type="hidden" name="appointment_id" value="{{ u.id }}">
+              <input type="hidden" name="action" value="note">
+              <input type="text" name="note" class="inp" style="flex:1;" placeholder="Add a visit note" value="{{ u.provider_note }}">
+              <button type="submit" class="btn btn-ghost" style="padding:8px 12px;font-size:12.5px;">Save</button>
+            </form>
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="appointment_id" value="{{ u.id }}">
+              <input type="hidden" name="action" value="complete">
+              <button type="submit" class="btn btn-green" style="padding:7px 12px;font-size:12.5px;">Mark completed</button>
+            </form>
           </div>
           {% empty %}
           <p style="color:var(--muted);font-size:13.5px;">No upcoming appointments.</p>

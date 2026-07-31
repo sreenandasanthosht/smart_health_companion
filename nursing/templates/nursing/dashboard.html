@@ -1,0 +1,83 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Nurse Dashboard &middot; CareNest{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar_nurse.html' with active='dashboard' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Nurse</span>
+        <h1>My patients</h1>
+        <div class="page-sub">Patients an administrator has assigned to you. Log a visit from any patient's page.</div>
+      </div>
+
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warn{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
+
+      <div class="grid stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:22px;">
+        <div class="card stat">
+          <div class="top"><span class="chip blue"><svg class="ic"><use href="#i-users"/></svg></span><div class="label">Assigned patients</div></div>
+          <div class="big">{{ assignment_count }}</div>
+        </div>
+        <div class="card stat">
+          <div class="top"><span class="chip green"><svg class="ic"><use href="#i-calendar-check"/></svg></span><div class="label">Visits this week</div></div>
+          <div class="big">{{ visits_this_week }}</div>
+        </div>
+        <div class="card stat">
+          <div class="top"><span class="chip orange"><svg class="ic"><use href="#i-shield-alert"/></svg></span><div class="label">Escalations raised</div></div>
+          <div class="big">{{ open_escalations }}</div>
+          <div class="meta">In the last 7 days</div>
+        </div>
+      </div>
+
+      <div class="grid g-3">
+        {% for c in cards %}
+        <div class="panel"><div class="p-body tall">
+          <div class="prov">
+            <div class="p-top"><span class="avatar-lg">{{ c.patient.initials }}</span>
+              {% if c.latest_vital %}
+              <span class="st {% if c.latest_vital.status == 'NORMAL' %}ok{% elif c.latest_vital.status == 'WATCH' %}watch{% else %}high{% endif %}">{{ c.latest_vital.get_status_display }}</span>
+              {% endif %}
+            </div>
+            <div class="p-name">{{ c.patient.display_name }}</div>
+            <div class="p-spec">{{ c.patient.unique_id }}</div>
+            <div class="p-meta">
+              {% if c.latest_vital %}
+                Last reading {{ c.latest_vital.bp_systolic }}/{{ c.latest_vital.bp_diastolic }} on {{ c.latest_vital.recorded_at|date:"j M" }}
+              {% else %}No readings yet{% endif %}
+              <br>
+              {% if c.last_visit %}Last visit {{ c.last_visit.visited_at|date:"j M Y" }}{% else %}No visits logged{% endif %}
+            </div>
+            <a href="{% url 'nurse_patient_detail' c.patient.id %}" class="btn btn-teal block">Open patient</a>
+          </div>
+        </div></div>
+        {% empty %}
+        <div class="panel" style="grid-column:1/-1;"><div class="p-body tall">
+          <p style="color:var(--muted);font-size:13.5px;margin:0;">
+            No patients assigned to you yet. An administrator creates assignments from the Admin &rarr; Nursing page.</p>
+        </div></div>
+        {% endfor %}
+      </div>
+
+      {% if recent_visits %}
+      <div class="panel" style="margin-top:22px;"><div class="p-body tall">
+        <h3 class="p-h"><svg class="ic"><use href="#i-clock"/></svg> Recent visits</h3>
+        <table class="dtable">
+          <thead><tr><th>Patient</th><th>When</th><th>Notes</th><th>Escalated</th></tr></thead>
+          <tbody>
+            {% for v in recent_visits %}
+            <tr>
+              <td style="font-weight:700;">{{ v.patient.display_name }}</td>
+              <td>{{ v.visited_at|date:"j M Y, g:i A" }}</td>
+              <td style="color:var(--muted);">{{ v.notes|truncatechars:60|default:"--" }}</td>
+              <td>{% if v.escalated %}<span class="pill danger">Yes</span>{% else %}<span class="pill muted">No</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div></div>
+      {% endif %}
+
+{% endblock %}

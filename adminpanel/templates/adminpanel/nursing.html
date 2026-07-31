@@ -1,0 +1,82 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Nursing &middot; CareNest{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar_admin.html' with active='nursing' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Admin</span>
+        <h1>Nursing</h1>
+        <div class="page-sub">Assign nurses to patients and review escalations raised during visits.</div>
+      </div>
+
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
+
+      <div class="grid g-7-5">
+        <div>
+          <div class="panel" style="margin-bottom:20px;"><div class="p-body tall">
+            <h3 class="p-h"><svg class="ic"><use href="#i-users"/></svg> Current assignments</h3>
+            <table class="dtable">
+              <thead><tr><th>Nurse</th><th>Patient</th><th>Since</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for a in assignments %}
+                <tr>
+                  <td style="font-weight:700;">{{ a.nurse.display_name }}</td>
+                  <td>{{ a.patient.display_name }}</td>
+                  <td>{{ a.start_date|date:"j M Y" }}</td>
+                  <td>{% if a.is_active %}<span class="pill ok">Active</span>{% else %}<span class="pill muted">Ended</span>{% endif %}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" style="color:var(--muted);">No assignments yet.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div></div>
+
+          <div class="panel"><div class="p-body tall">
+            <h3 class="p-h"><svg class="ic"><use href="#i-shield-alert"/></svg> Escalations</h3>
+            {% for v in escalations %}
+            <div class="lrow">
+              <span class="ri tint-red" style="width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:0 0 38px;">
+                <svg class="ic"><use href="#i-shield-alert"/></svg></span>
+              <div class="grow">
+                <div class="t">{{ v.patient.display_name }} &mdash; {{ v.escalation_reason|default:"Escalated" }}</div>
+                <div class="s">Raised by {{ v.nurse.display_name }} on {{ v.visited_at|date:"j M Y, g:i A" }}</div>
+              </div>
+              <span class="pill {% if v.severity == 'URGENT' %}danger{% else %}warn{% endif %}">{{ v.get_severity_display }}</span>
+            </div>
+            {% empty %}
+            <p style="color:var(--muted);font-size:13.5px;">No escalations raised.</p>
+            {% endfor %}
+          </div></div>
+        </div>
+
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-heart"/></svg> Assign a nurse</h3>
+          {% if nurses %}
+          <form method="post">
+            {% csrf_token %}
+            <div class="field"><label>Nurse</label>
+              <select name="nurse_id" class="inp" required>
+                <option value="">Choose a nurse</option>
+                {% for n in nurses %}<option value="{{ n.id }}">{{ n.display_name }}</option>{% endfor %}
+              </select></div>
+            <div class="field"><label>Patient</label>
+              <select name="patient_id" class="inp" required>
+                <option value="">Choose a patient</option>
+                {% for p in patients %}<option value="{{ p.id }}">{{ p.display_name }} ({{ p.unique_id }})</option>{% endfor %}
+              </select></div>
+            <button type="submit" class="btn btn-teal block">Create assignment</button>
+          </form>
+          {% else %}
+          <p style="color:var(--muted);font-size:13.5px;">There are no nurse accounts yet. Promote a user to Nurse from the
+            <a href="{% url 'admin_users' %}">Users page</a> &mdash; nurses cannot self-register.</p>
+          {% endif %}
+        </div></div>
+      </div>
+
+{% endblock %}

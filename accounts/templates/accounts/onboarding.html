@@ -1,28 +1,24 @@
 {% extends 'base_auth.html' %}
-{% block title %}Onboarding &middot; Smart Health Companion{% endblock %}
+{% block title %}Onboarding &middot; CareNest{% endblock %}
 {% block side_title %}Just a few details.{% endblock %}
-{% block side_text %}Tell us a little about yourself so we can tailor your dashboard. You can change any of this later.{% endblock %}
+{% block side_text %}Tell us a little about yourself so we can set things up. You can change any of this later.{% endblock %}
 
 {% block auth_content %}
       <span class="chip-role">{{ content.label }}</span>
       <h1 class="a-title" style="margin-top:10px;">{{ content.heading }}</h1>
-      <p class="a-sub">A few quick details before you land on your dashboard.</p>
-
-      <div class="callout info">
-        <svg class="ic"><use href="#i-sparkles"/></svg>
-        <div class="c-body"><strong>Prototype.</strong> This wizard previews the fields we'll collect. Nothing is saved yet &mdash; continuing takes you to the dashboard preview.</div>
-      </div>
+      <p class="a-sub">{{ content.intro }}</p>
 
       <form method="post">
         {% csrf_token %}
-        {% for step in content.steps %}
         <div class="step-card">
-          <div class="s-head"><span class="s-num">{{ forloop.counter }}</span><h3>{{ step.title }}</h3></div>
-          {% for field in step.fields %}
-          <div class="field"><label>{{ field }}</label><input type="text" class="inp" placeholder="{{ field }}"></div>
+          <div class="s-head"><span class="s-num">1</span><h3>Your details</h3></div>
+          {% for f in content.fields %}
+          <div class="field">
+            <label>{{ f.label }}</label>
+            <input type="{{ f.type }}" name="{{ f.name }}" class="inp" placeholder="{{ f.placeholder }}">
+          </div>
           {% endfor %}
         </div>
-        {% endfor %}
         <button type="submit" class="btn btn-teal block">{{ content.next_label }} <svg class="ic"><use href="#i-arrow-right"/></svg></button>
       </form>
 {% endblock %}

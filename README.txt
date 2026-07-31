@@ -1,4 +1,4 @@
-Smart Health Companion — UI Mockups (Django templates + Bootstrap 5, dummy data)
+CareNest — UI Mockups (Django templates + Bootstrap 5, dummy data)
 
 HOW TO USE
 - Open any .html file in a browser (internet needed: Bootstrap/Icons/Chart.js load from CDN).

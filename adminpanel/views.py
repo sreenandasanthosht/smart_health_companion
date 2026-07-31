@@ -1,105 +1,234 @@
 """
-adminpanel app views -- the platform Admin's dashboard: overview KPIs,
-provider verification queue, user management, provider management and
-the audit log.
+adminpanel app views -- the platform Admin's dashboard: overview KPIs, the
+provider verification queue, user management, provider management and the
+audit log.
 
-Like the rest of the app right now, every context dict below is
-placeholder/demo data. This app doesn't have its own models -- once the
-real User/Provider/audit-log data exists (Phase 3/4 of the task plan),
-these views will query the database instead of returning fixed demo
-values. These pages exist now purely to preview the Admin experience.
+Distinct from Django's own /admin/ site: this is the in-app admin surface,
+restricted to users whose role is ADMIN.
 """
-from django.shortcuts import render
+import datetime
+
+from django.contrib import messages
+from django.db.models import Count, Q
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+
+from accounts.decorators import role_required
+from accounts.models import CaregiverLink, User
+from adminpanel.models import AuditLog
+from health.models import ConsentGrant, VitalRecord
+from nursing.models import NurseAssignment, NursingVisit
+from providers.models import Appointment, ProviderProfile
 
 
+@role_required(User.Role.ADMIN)
 def dashboard(request):
+    today = timezone.localdate()
+    start_of_today = timezone.make_aware(
+        datetime.datetime.combine(today, datetime.time.min), timezone.get_current_timezone())
+
+    total_users = User.objects.count()
+    pending_profiles = ProviderProfile.objects.filter(
+        verification_status=ProviderProfile.Verification.PENDING).select_related('user')
+    pending_count = pending_profiles.count()
+    verified_count = ProviderProfile.objects.filter(
+        verification_status=ProviderProfile.Verification.VERIFIED).count()
+
+    new_today = User.objects.filter(date_joined__gte=start_of_today)
+    breakdown = new_today.values('role').annotate(n=Count('id'))
+    breakdown_text = ', '.join(
+        f"{row['n']} {User.Role(row['role']).label.lower()}{'s' if row['n'] != 1 else ''}"
+        for row in breakdown
+    ) or 'No sign-ups yet today'
+
+    needs_attention = []
+    if pending_count:
+        oldest = pending_profiles.order_by('submitted_at').first()
+        names = ', '.join(p.display_name() for p in pending_profiles[:3])
+        days = (timezone.now() - oldest.submitted_at).days
+        needs_attention.append({
+            'text': f"{pending_count} provider verification{'s' if pending_count != 1 else ''} pending review",
+            'sub': f"Oldest submitted {days} day{'s' if days != 1 else ''} ago -- {names}",
+            'url_name': 'admin_verification', 'cta': 'Review queue',
+        })
+
+    incomplete = ProviderProfile.objects.filter(
+        verification_status=ProviderProfile.Verification.NEEDS_INFO).count()
+    if incomplete:
+        needs_attention.append({
+            'text': f"{incomplete} provider{'s' if incomplete != 1 else ''} asked for more information",
+            'sub': 'Waiting on the provider to resubmit documents',
+            'url_name': 'admin_providers', 'cta': 'View providers',
+        })
+
+    pending_links = CaregiverLink.objects.filter(status=CaregiverLink.Status.PENDING).count()
+    if pending_links:
+        needs_attention.append({
+            'text': f"{pending_links} caregiver link request{'s' if pending_links != 1 else ''} awaiting patient approval",
+            'sub': 'Patients approve these themselves -- shown here for visibility',
+            'url_name': 'admin_users', 'cta': 'View users',
+        })
+
+    urgent_visits = NursingVisit.objects.filter(
+        escalated=True, severity=NursingVisit.Severity.URGENT,
+        visited_at__gte=timezone.now() - datetime.timedelta(days=7)).count()
+    if urgent_visits:
+        needs_attention.append({
+            'text': f"{urgent_visits} urgent nursing escalation{'s' if urgent_visits != 1 else ''} this week",
+            'sub': 'Raised by nurses during home visits',
+            'url_name': None, 'cta': '',
+        })
+
+    suspended = User.objects.filter(is_suspended=True).count()
+    if suspended:
+        needs_attention.append({
+            'text': f"{suspended} suspended account{'s' if suspended != 1 else ''}",
+            'sub': 'Review whether these should be reinstated',
+            'url_name': 'admin_users', 'cta': 'View users',
+        })
+
+    appts_today = Appointment.objects.filter(
+        scheduled_for__gte=start_of_today,
+        scheduled_for__lt=start_of_today + datetime.timedelta(days=1)).count()
+    shares_active = sum(1 for g in ConsentGrant.objects.all() if g.is_active())
+    shares_revoked = ConsentGrant.objects.filter(revoked_at__isnull=False).count()
+    vitals_today = VitalRecord.objects.filter(recorded_at__gte=start_of_today).count()
+
     context = {
-        'admin_name': 'Admin',
-        'total_users': '3,240',
-        'verified_providers': 179,
-        'pending_verifications': 7,
-        'new_signups_today': 42,
-        'new_signups_breakdown': '38 patients, 4 providers',
-        'needs_attention': [
-            {
-                'text': '7 provider verifications pending review',
-                'sub': 'Oldest submitted 4 days ago -- Prakash Diagnostics, Serene Minds, +5 more',
-                'url_name': 'admin_verification',
-                'cta': 'Review queue',
-            },
-            {
-                'text': '2 announcements flagged for review',
-                'sub': 'Reported by users -- "Monsoon health camp" & "Free BP check-up" posts',
-                'url_name': None,
-                'cta': 'Open announcements',
-            },
-            {
-                'text': '3 user accounts awaiting support response',
-                'sub': 'Password & account recovery tickets -- SLA under 24h',
-                'url_name': 'admin_users',
-                'cta': 'View users',
-            },
-        ],
+        'admin_name': request.user.display_name,
+        'total_users': total_users,
+        'verified_providers': verified_count,
+        'pending_verifications': pending_count,
+        'new_signups_today': new_today.count(),
+        'new_signups_breakdown': breakdown_text,
+        'needs_attention': needs_attention,
         'today': [
-            {'label': '42 new sign-ups', 'sub': '38 patients, 4 providers'},
-            {'label': '94 medicine orders', 'sub': '81 delivered, 13 in progress'},
-            {'label': '158 appointments booked', 'sub': 'Across 62 providers'},
-            {'label': '27 record shares granted', 'sub': '6 revoked by patients'},
+            {'label': f"{new_today.count()} new sign-ups", 'sub': breakdown_text},
+            {'label': f"{vitals_today} vitals logged", 'sub': 'Across all patients today'},
+            {'label': f"{appts_today} appointments scheduled", 'sub': f"Across {verified_count} verified providers"},
+            {'label': f"{shares_active} active record shares", 'sub': f"{shares_revoked} revoked in total"},
         ],
+        'recent_audit': AuditLog.objects.all()[:6],
+        'role_counts': User.objects.values('role').annotate(n=Count('id')).order_by('-n'),
     }
     return render(request, 'adminpanel/dashboard.html', context)
 
 
+@role_required(User.Role.ADMIN)
 def verification(request):
+    if request.method == 'POST':
+        profile = get_object_or_404(ProviderProfile, pk=request.POST.get('profile_id'))
+        action = request.POST.get('action')
+        if action == 'approve':
+            profile.approve()
+            AuditLog.record(request.user, 'Approved provider', profile.display_name(), AuditLog.Tag.OK)
+            messages.success(request, f'{profile.display_name()} is now verified and listed in the directory.')
+        elif action == 'needs_info':
+            note = request.POST.get('note', '').strip() or 'Documents incomplete or unclear.'
+            profile.request_more_info(note)
+            AuditLog.record(request.user, 'Requested more information',
+                            f"{profile.display_name()} -- {note}", AuditLog.Tag.DANGER)
+            messages.info(request, f'{profile.display_name()} has been asked to resubmit.')
+        return redirect('admin_verification')
+
+    queue = ProviderProfile.objects.select_related('user').order_by('verification_status', 'submitted_at')
     context = {
-        'queue': [
-            {'name': 'Prakash Diagnostics', 'meta': 'Jayanagar, Bengaluru', 'type': 'Diagnostics', 'submitted': '20 Jul 2026', 'status': 'pending'},
-            {'name': 'Serene Minds Wellness', 'meta': 'Indiranagar, Bengaluru', 'type': 'Wellness', 'submitted': '21 Jul 2026', 'status': 'pending'},
-            {'name': 'Dr. Ravi Shankar', 'meta': 'Cardiologist', 'type': 'Doctor', 'submitted': '22 Jul 2026', 'status': 'pending'},
-            {'name': 'HealWell Pharmacy', 'meta': 'Malleshwaram, Bengaluru', 'type': 'Pharmacy', 'submitted': '22 Jul 2026', 'status': 'pending'},
-            {'name': 'FitLife Centre', 'meta': 'Koramangala, Bengaluru', 'type': 'Wellness', 'submitted': '18 Jul 2026', 'status': 'approved'},
-        ],
+        'queue': queue,
+        'pending_count': sum(1 for p in queue if p.verification_status == ProviderProfile.Verification.PENDING),
     }
     return render(request, 'adminpanel/verification.html', context)
 
 
+@role_required(User.Role.ADMIN)
 def users(request):
+    if request.method == 'POST':
+        target = get_object_or_404(User, pk=request.POST.get('user_id'))
+        action = request.POST.get('action')
+        if target == request.user:
+            messages.error(request, "You can't change your own account from here.")
+        elif action == 'suspend':
+            target.is_suspended = True
+            target.save(update_fields=['is_suspended'])
+            AuditLog.record(request.user, 'Suspended user', target.display_name, AuditLog.Tag.DANGER)
+            messages.info(request, f'{target.display_name} has been suspended.')
+        elif action == 'reinstate':
+            target.is_suspended = False
+            target.save(update_fields=['is_suspended'])
+            AuditLog.record(request.user, 'Reinstated user', target.display_name, AuditLog.Tag.OK)
+            messages.success(request, f'{target.display_name} has been reinstated.')
+        elif action == 'make_nurse':
+            target.role = User.Role.NURSE
+            target.save(update_fields=['role'])
+            AuditLog.record(request.user, 'Assigned Nurse role', target.display_name, AuditLog.Tag.WARN)
+            messages.success(request, f'{target.display_name} is now a Nurse.')
+        return redirect('admin_users')
+
+    query = request.GET.get('q', '').strip()
+    role = request.GET.get('role', '').strip()
+    people = User.objects.all().order_by('-date_joined')
+    if query:
+        people = people.filter(
+            Q(username__icontains=query) | Q(email__icontains=query)
+            | Q(first_name__icontains=query) | Q(unique_id__icontains=query))
+    if role:
+        people = people.filter(role=role)
+
     context = {
-        'users': [
-            {'name': 'Latha R.', 'email': 'latha.r@gmail.com', 'role': 'Patient', 'status': 'active', 'joined': '12 Feb 2026', 'last_active': 'Today, 09:14'},
-            {'name': 'Ramesh K.', 'email': 'ramesh.kumar@gmail.com', 'role': 'Patient', 'status': 'active', 'joined': '03 Mar 2026', 'last_active': 'Yesterday, 18:40'},
-            {'name': 'Meera R.', 'email': 'meera.r@gmail.com', 'role': 'Caregiver', 'status': 'active', 'joined': '03 Mar 2026', 'last_active': 'Today, 08:02'},
-            {'name': 'Dr. A. Nair', 'email': 'dr.anair@citycare.in', 'role': 'Provider', 'status': 'active', 'joined': '15 Jan 2026', 'last_active': 'Today, 07:55'},
-            {'name': 'Suresh V.', 'email': 'suresh.v@gmail.com', 'role': 'Patient', 'status': 'suspended', 'joined': '09 Apr 2026', 'last_active': '02 Jul 2026'},
-            {'name': 'Prakash Diagnostics', 'email': 'lab@prakashdiag.in', 'role': 'Provider', 'status': 'pending', 'joined': '20 Jul 2026', 'last_active': 'Today, 10:41'},
-        ],
+        'users': people[:100],
+        'query': query,
+        'selected_role': role,
+        'roles': User.Role.choices,
+        'total': people.count(),
     }
     return render(request, 'adminpanel/users.html', context)
 
 
+@role_required(User.Role.ADMIN)
 def providers(request):
+    profiles = ProviderProfile.objects.select_related('user').annotate(
+        appointment_count=Count('appointments'))
     context = {
-        'providers': [
-            {'name': 'Dr. A. Nair', 'meta': 'General Physician, Indiranagar', 'type': 'Doctor', 'verification': 'verified', 'rating': '4.8', 'listings': 3},
-            {'name': 'City Care Clinic', 'meta': 'Multi-speciality, Koramangala', 'type': 'Clinic', 'verification': 'verified', 'rating': '4.4', 'listings': 12},
-            {'name': 'Prakash Diagnostics', 'meta': 'Pathology & Imaging, Jayanagar', 'type': 'Diagnostics', 'verification': 'pending', 'rating': None, 'listings': 0},
-            {'name': 'MedPlus Pharmacy', 'meta': '24x7 Store, HSR Layout', 'type': 'Pharmacy', 'verification': 'verified', 'rating': '4.2', 'listings': None},
-            {'name': 'FitLife Centre', 'meta': 'Gym & Personal Training, Koramangala', 'type': 'Fitness', 'verification': 'verified', 'rating': '4.7', 'listings': 6},
-            {'name': 'Dr. Ravi Shankar', 'meta': 'Cardiologist, Whitefield', 'type': 'Doctor', 'verification': 'rejected', 'rating': None, 'listings': 0},
-        ],
+        'providers': profiles,
+        'verified': sum(1 for p in profiles if p.is_verified),
     }
     return render(request, 'adminpanel/providers.html', context)
 
 
+@role_required(User.Role.ADMIN)
 def audit_log(request):
+    tag = request.GET.get('tag', '').strip()
+    entries = AuditLog.objects.select_related('actor')
+    if tag:
+        entries = entries.filter(tag=tag)
     context = {
-        'entries': [
-            {'date': '24 Jul 2026', 'time': '10:42', 'actor': 'Admin', 'action': 'Approved provider', 'tag': 'ok', 'target': 'Dr. A. Nair'},
-            {'date': '24 Jul 2026', 'time': '10:15', 'actor': 'Latha R.', 'action': 'Revoked a record share', 'tag': 'muted', 'target': 'Dr. A. Nair -- BP report'},
-            {'date': '24 Jul 2026', 'time': '09:58', 'actor': 'MedPlus', 'action': 'Marked order delivered', 'tag': 'muted', 'target': 'Order #1042 -- Ramesh K.'},
-            {'date': '24 Jul 2026', 'time': '09:31', 'actor': 'Admin', 'action': 'Suspended user', 'tag': 'danger', 'target': 'Suresh V. -- spam reports'},
-            {'date': '23 Jul 2026', 'time': '16:05', 'actor': 'Admin', 'action': 'Rejected provider', 'tag': 'danger', 'target': 'Dr. Ravi Shankar -- invalid licence'},
-            {'date': '22 Jul 2026', 'time': '19:47', 'actor': 'Prakash Diagnostics', 'action': 'Submitted documents', 'tag': 'warn', 'target': 'NABL cert, GST reg'},
-        ],
+        'entries': entries[:200],
+        'selected_tag': tag,
+        'tags': AuditLog.Tag.choices,
     }
     return render(request, 'adminpanel/audit_log.html', context)
+
+
+@role_required(User.Role.ADMIN)
+def nursing(request):
+    """Assign nurses to patients and review escalations."""
+    if request.method == 'POST':
+        nurse = User.objects.filter(pk=request.POST.get('nurse_id'), role=User.Role.NURSE).first()
+        patient = User.objects.filter(pk=request.POST.get('patient_id'), role=User.Role.PATIENT).first()
+        if not (nurse and patient):
+            messages.error(request, 'Pick both a nurse and a patient.')
+        elif NurseAssignment.objects.filter(nurse=nurse, patient=patient, end_date__isnull=True).exists():
+            messages.info(request, 'That nurse is already assigned to this patient.')
+        else:
+            NurseAssignment.objects.create(nurse=nurse, patient=patient, assigned_by=request.user)
+            AuditLog.record(request.user, 'Assigned nurse',
+                            f"{nurse.display_name} -> {patient.display_name}", AuditLog.Tag.OK)
+            messages.success(request, f'{nurse.display_name} assigned to {patient.display_name}.')
+        return redirect('admin_nursing')
+
+    context = {
+        'assignments': NurseAssignment.objects.select_related('nurse', 'patient'),
+        'nurses': User.objects.filter(role=User.Role.NURSE),
+        'patients': User.objects.filter(role=User.Role.PATIENT),
+        'escalations': NursingVisit.objects.filter(escalated=True).select_related('nurse', 'patient')[:20],
+    }
+    return render(request, 'adminpanel/nursing.html', context)

@@ -2,7 +2,7 @@
 
 ## Why this exists
 
-Smart Health Companion handles sensitive health data -- vitals, medications, prescriptions,
+CareNest handles sensitive health data -- vitals, medications, prescriptions,
 mental health entries -- and that data sometimes needs to cross a boundary: from the
 patient to a caregiver, a nurse, a provider, or (briefly) an OCR/LLM extraction pipeline.
 Every one of those crossings needs the patient's explicit, revocable consent. This document

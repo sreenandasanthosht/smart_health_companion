@@ -1,32 +1,31 @@
 {% extends 'base_dashboard.html' %}
-{% block title %}Patient Dashboard · Smart Health Companion{% endblock %}
+{% block title %}Patient Dashboard &middot; CareNest{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar.html' with active='dashboard' %}{% endblock %}
 
 {% block dashboard_content %}
 
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warn{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
 
       <div class="greet-row">
         <div class="greet">
-          <h1>Good Morning, Terese! &#128075;</h1>
-          <div class="sub">Let's make today a healthy day.</div>
-          <div class="date"><svg class="ic"><use href="#i-calendar"/></svg> 24 July 2026, Thursday</div>
+          <h1>Hello, {{ patient.first_name|default:patient.display_name }}!</h1>
+          <div class="sub">Your patient ID is <strong>{{ patient.unique_id }}</strong> &mdash; share it with a caregiver to link them.</div>
+          <div class="date"><svg class="ic"><use href="#i-calendar"/></svg> {{ today|date:"j F Y, l" }}</div>
         </div>
         <div class="ai-card">
           <div class="ai-body">
-            <div class="ai-title"><svg class="ic"><use href="#i-sparkles"/></svg> AI Health Summary</div>
+            <div class="ai-title"><svg class="ic"><use href="#i-sparkles"/></svg> Health Summary</div>
             <div class="ai-list">
-              <div class="li"><span class="ck"><svg class="ic"><use href="#i-check"/></svg></span> 3 medicines due today</div>
-              <div class="li"><span class="ck"><svg class="ic"><use href="#i-check"/></svg></span> BP is within normal range</div>
-              <div class="li"><span class="ck"><svg class="ic"><use href="#i-check"/></svg></span> Appointment tomorrow</div>
-              <div class="li"><span class="ck"><svg class="ic"><use href="#i-check"/></svg></span> Keep up your hydration</div>
+              {% for insight in insights|slice:":4" %}
+              <div class="li"><span class="ck"><svg class="ic"><use href="#i-check"/></svg></span> {{ insight.text }}</div>
+              {% endfor %}
             </div>
           </div>
           <svg class="shield" viewBox="0 0 150 150" fill="none">
-            <g opacity=".55" fill="#a7f3d0">
-              <path d="M30 40c-8-3-16-2-22 3 7 2 14 6 18 12 3-7 3-11 4-15z"/>
-              <path d="M120 40c8-3 16-2 22 3-7 2-14 6-18 12-3-7-3-11-4-15z"/>
-              <path d="M22 78c-7 1-13 5-16 11 6 0 13 1 18 5 0-7-1-11-2-16z"/>
-              <path d="M128 78c7 1 13 5 16 11-6 0-13 1-18 5 0-7 1-11 2-16z"/>
-            </g>
             <path d="M75 18l40 16v30c0 30-20 52-40 60-20-8-40-30-40-60V34z" fill="url(#sg)"/>
             <path d="M75 18l40 16v30c0 30-20 52-40 60V18z" fill="#059669" opacity=".25"/>
             <path d="M58 74l12 12 24-26" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
@@ -36,148 +35,191 @@
         </div>
       </div>
 
+      {% if show_profile_prompt %}
+      <div class="callout warn">
+        <svg class="ic"><use href="#i-user"/></svg>
+        <div class="c-body">
+          <strong>Your profile is {{ profile_completion }}% complete.</strong>
+          Still needed: {{ missing_fields|join:", " }}.
+          <a href="{% url 'profile' %}" style="font-weight:700;">Complete it now &rarr;</a>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if pending_caregivers %}
+      <div class="callout info">
+        <svg class="ic"><use href="#i-users"/></svg>
+        <div class="c-body">
+          <strong>{{ pending_caregivers|length }} caregiver request{{ pending_caregivers|length|pluralize }}</strong> waiting for your approval.
+          <a href="{% url 'health_caregiver_requests' %}" style="font-weight:700;">Review &rarr;</a>
+        </div>
+      </div>
+      {% endif %}
+
       <div class="grid stats">
         <div class="card stat">
           <div class="top"><span class="chip green"><svg class="ic"><use href="#i-pill"/></svg></span></div>
           <div class="label">Medicines Due</div>
-          <div class="big">3</div>
-          <div class="meta">Medicines today</div>
-          <a class="link" href="#">View details <svg class="ic"><use href="#i-arrow-right"/></svg></a>
+          <div class="big">{{ doses_due }}</div>
+          <div class="meta">{% if adherence is not None %}{{ adherence }}% taken over 14 days{% else %}No doses tracked yet{% endif %}</div>
+          <a class="link" href="{% url 'health_medications' %}">View medicines <svg class="ic"><use href="#i-arrow-right"/></svg></a>
         </div>
+
         <div class="card stat appt">
-          <div class="top"><span class="chip blue"><svg class="ic"><use href="#i-calendar-days"/></svg></span><div class="label">Upcoming Appointment</div></div>
-          <div class="big">Tomorrow</div>
-          <div class="meta">10:30 AM</div>
-          <div class="meta">Dietician</div>
-          <a class="link" href="#">View appointment <svg class="ic"><use href="#i-arrow-right"/></svg></a>
+          <div class="top"><span class="chip blue"><svg class="ic"><use href="#i-calendar-days"/></svg></span><div class="label">Next Appointment</div></div>
+          {% if next_appointment %}
+          <div class="big">{{ next_appointment.scheduled_for|date:"j M" }}</div>
+          <div class="meta">{{ next_appointment.scheduled_for|date:"g:i A" }}</div>
+          <div class="meta">{{ next_appointment.provider.display_name }}</div>
+          {% else %}
+          <div class="big">None</div>
+          <div class="meta">Nothing booked yet</div>
+          {% endif %}
+          <a class="link" href="{% url 'provider_appointments' %}">Manage <svg class="ic"><use href="#i-arrow-right"/></svg></a>
         </div>
+
         <div class="card stat reminder">
-          <div class="top"><span class="chip orange"><svg class="ic"><use href="#i-bell"/></svg></span><div class="label">Next Reminder</div></div>
-          <div class="big">Lab test due</div>
-          <div class="meta">Blood Test</div>
-          <a class="link" href="#">View details <svg class="ic"><use href="#i-arrow-right"/></svg></a>
+          <div class="top"><span class="chip orange"><svg class="ic"><use href="#i-bell"/></svg></span><div class="label">Next Refill</div></div>
+          {% if upcoming_refill %}
+          <div class="big">{{ upcoming_refill.name }}</div>
+          <div class="meta">Due {{ upcoming_refill.next_refill_date|date:"j M Y" }}</div>
+          {% else %}
+          <div class="big">None set</div>
+          <div class="meta">Add a refill date to a medicine</div>
+          {% endif %}
+          <a class="link" href="{% url 'health_medications' %}">View details <svg class="ic"><use href="#i-arrow-right"/></svg></a>
         </div>
+
         <div class="card stat">
           <div class="top"><span class="chip purple"><svg class="ic"><use href="#i-heart-pulse"/></svg></span><div class="label">Health Score</div></div>
           <div class="score-wrap">
             <div>
-              <div class="big">82 <small>/100</small></div>
-              <div class="meta" style="color:#16a34a;font-weight:700;">Good</div>
+              <div class="big">{{ health_score }} <small>/100</small></div>
+              <div class="meta" style="color:#16a34a;font-weight:700;">{{ health_band }}</div>
             </div>
             <div class="score-ring">
               <svg viewBox="0 0 74 74"><circle cx="37" cy="37" r="31" fill="none" stroke="#eef1f6" stroke-width="8"/>
                 <circle cx="37" cy="37" r="31" fill="none" stroke="url(#pg)" stroke-width="8" stroke-linecap="round"
-                  stroke-dasharray="195" stroke-dashoffset="35" transform="rotate(-90 37 37)"/>
+                  stroke-dasharray="195" stroke-dashoffset="{{ score_offset }}" transform="rotate(-90 37 37)"/>
                 <defs><linearGradient id="pg" x1="0" y1="0" x2="74" y2="74"><stop stop-color="#a78bfa"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs></svg>
             </div>
           </div>
-          <a class="link" href="#" style="margin-top:10px;">See analytics <svg class="ic"><use href="#i-arrow-right"/></svg></a>
+          <a class="link" href="{% url 'health_vitals' %}" style="margin-top:10px;">See vitals <svg class="ic"><use href="#i-arrow-right"/></svg></a>
         </div>
       </div>
 
       <div class="section panel">
         <div class="panel-head">
           <div class="h"><svg class="ic"><use href="#i-activity"/></svg> Health Analytics</div>
-          <div class="tabs"><span class="tab active">Vitals</span><span class="tab">Fitness</span><span class="tab">Lifestyle</span></div>
-          <a class="right" href="#">View full analytics <svg class="ic"><use href="#i-arrow-right"/></svg></a>
+          <a class="right" href="{% url 'health_vitals' %}">Log a reading <svg class="ic"><use href="#i-arrow-right"/></svg></a>
         </div>
         <div class="grid analytics-grid">
           <div class="metric">
             <div class="m-label">Blood Pressure</div>
-            <div class="m-val"><b>120/80</b><span class="unit">mmHg</span><span class="tag">Normal</span></div>
+            <div class="m-val"><b>{{ series.bp.latest|default:"--" }}</b><span class="unit">mmHg</span><span class="tag">{{ series.bp.status }}</span></div>
+            {% if sparklines.bp %}
             <svg class="spark" viewBox="0 0 240 56" preserveAspectRatio="none">
-              <defs><linearGradient id="fg" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#22c55e" stop-opacity=".22"/><stop offset="1" stop-color="#22c55e" stop-opacity="0"/></linearGradient></defs>
-              <path d="M0,38 C20,36 30,30 48,32 C66,34 78,26 96,30 C114,34 126,28 144,30 C162,32 174,24 192,28 C210,32 222,30 240,26 L240,56 L0,56 Z" fill="url(#fg)"/>
-              <path d="M0,38 C20,36 30,30 48,32 C66,34 78,26 96,30 C114,34 126,28 144,30 C162,32 174,24 192,28 C210,32 222,30 240,26" fill="none" stroke="#22c55e" stroke-width="2.5"/>
-              <g fill="#16a34a"><circle cx="48" cy="32" r="3"/><circle cx="96" cy="30" r="3"/><circle cx="144" cy="30" r="3"/><circle cx="192" cy="28" r="3"/><circle cx="240" cy="26" r="3"/></g>
+              <polyline points="{{ sparklines.bp }}" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linejoin="round"/>
             </svg>
-            <div class="axis"><span>18 Jul</span><span>19 Jul</span><span>20 Jul</span><span>21 Jul</span><span>22 Jul</span><span>24 Jul</span></div>
+            {% else %}<div class="hint">Log at least two readings to see a trend.</div>{% endif %}
+            <div class="axis">{% for l in series.bp.labels %}<span>{{ l }}</span>{% endfor %}</div>
           </div>
+
           <div class="metric">
             <div class="m-label">Heart Rate</div>
-            <div class="m-val"><b style="color:#3b82f6;">72</b><span class="unit">bpm</span><span class="tag">Normal</span></div>
+            <div class="m-val"><b style="color:#3b82f6;">{{ series.heart_rate.latest|default:"--" }}</b><span class="unit">bpm</span><span class="tag">{{ series.heart_rate.status }}</span></div>
+            {% if sparklines.heart_rate %}
             <svg class="spark" viewBox="0 0 240 56" preserveAspectRatio="none">
-              <defs><linearGradient id="fb" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#3b82f6" stop-opacity=".22"/><stop offset="1" stop-color="#3b82f6" stop-opacity="0"/></linearGradient></defs>
-              <path d="M0,34 C20,30 30,36 48,34 C66,32 78,22 96,26 C114,30 126,34 144,30 C162,26 174,32 192,30 C210,28 222,18 240,22 L240,56 L0,56 Z" fill="url(#fb)"/>
-              <path d="M0,34 C20,30 30,36 48,34 C66,32 78,22 96,26 C114,30 126,34 144,30 C162,26 174,32 192,30 C210,28 222,18 240,22" fill="none" stroke="#3b82f6" stroke-width="2.5"/>
-              <g fill="#2563eb"><circle cx="48" cy="34" r="3"/><circle cx="96" cy="26" r="3"/><circle cx="144" cy="30" r="3"/><circle cx="192" cy="30" r="3"/><circle cx="240" cy="22" r="3"/></g>
+              <polyline points="{{ sparklines.heart_rate }}" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linejoin="round"/>
             </svg>
-            <div class="axis"><span>18 Jul</span><span>19 Jul</span><span>20 Jul</span><span>22 Jul</span><span>23 Jul</span></div>
+            {% else %}<div class="hint">Log at least two readings to see a trend.</div>{% endif %}
+            <div class="axis">{% for l in series.heart_rate.labels %}<span>{{ l }}</span>{% endfor %}</div>
           </div>
+
           <div class="metric">
             <div class="m-label">Blood Sugar</div>
-            <div class="m-val"><b style="color:#8b5cf6;">110</b><span class="unit">mg/dL</span><span class="tag" style="color:#8b5cf6;">Normal</span></div>
+            <div class="m-val"><b style="color:#8b5cf6;">{{ series.blood_sugar.latest|default:"--" }}</b><span class="unit">mg/dL</span><span class="tag" style="color:#8b5cf6;">{{ series.blood_sugar.status }}</span></div>
+            {% if sparklines.blood_sugar %}
             <svg class="spark" viewBox="0 0 240 56" preserveAspectRatio="none">
-              <defs><linearGradient id="fp" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#8b5cf6" stop-opacity=".22"/><stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/></linearGradient></defs>
-              <path d="M0,30 C20,32 30,26 48,28 C66,30 78,36 96,32 C114,28 126,30 144,34 C162,38 174,28 192,30 C210,32 222,26 240,30 L240,56 L0,56 Z" fill="url(#fp)"/>
-              <path d="M0,30 C20,32 30,26 48,28 C66,30 78,36 96,32 C114,28 126,30 144,34 C162,38 174,28 192,30 C210,32 222,26 240,30" fill="none" stroke="#8b5cf6" stroke-width="2.5"/>
-              <g fill="#7c3aed"><circle cx="48" cy="28" r="3"/><circle cx="96" cy="32" r="3"/><circle cx="144" cy="34" r="3"/><circle cx="192" cy="30" r="3"/><circle cx="240" cy="30" r="3"/></g>
+              <polyline points="{{ sparklines.blood_sugar }}" fill="none" stroke="#8b5cf6" stroke-width="2.5" stroke-linejoin="round"/>
             </svg>
-            <div class="axis"><span>18 Jul</span><span>19 Jul</span><span>20 Jul</span><span>21 Jul</span><span>23 Jul</span></div>
+            {% else %}<div class="hint">Log at least two readings to see a trend.</div>{% endif %}
+            <div class="axis">{% for l in series.blood_sugar.labels %}<span>{{ l }}</span>{% endfor %}</div>
           </div>
+
           <div class="metric">
-            <div class="m-label">SpO<sub>2</sub></div>
-            <div class="m-val"><b style="color:#14b8a6;">98</b><span class="unit">%</span><span class="tag">Normal</span></div>
+            <div class="m-label">Weight</div>
+            <div class="m-val"><b style="color:#14b8a6;">{{ series.weight.latest|default:"--" }}</b><span class="unit">kg</span></div>
+            {% if sparklines.weight %}
             <svg class="spark" viewBox="0 0 240 56" preserveAspectRatio="none">
-              <defs><linearGradient id="ft" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#14b8a6" stop-opacity=".22"/><stop offset="1" stop-color="#14b8a6" stop-opacity="0"/></linearGradient></defs>
-              <path d="M0,30 C20,31 30,29 48,30 C66,31 78,32 96,31 C114,30 126,28 144,30 C162,32 174,30 192,29 C210,28 222,30 240,29 L240,56 L0,56 Z" fill="url(#ft)"/>
-              <path d="M0,30 C20,31 30,29 48,30 C66,31 78,32 96,31 C114,30 126,28 144,30 C162,32 174,30 192,29 C210,28 222,30 240,29" fill="none" stroke="#14b8a6" stroke-width="2.5"/>
-              <g fill="#0d9488"><circle cx="48" cy="30" r="3"/><circle cx="96" cy="31" r="3"/><circle cx="144" cy="30" r="3"/><circle cx="192" cy="29" r="3"/><circle cx="240" cy="29" r="3"/></g>
+              <polyline points="{{ sparklines.weight }}" fill="none" stroke="#14b8a6" stroke-width="2.5" stroke-linejoin="round"/>
             </svg>
-            <div class="axis"><span>18 Jul</span><span>19 Jul</span><span>20 Jul</span><span>22 Jul</span><span>23 Jul</span><span>24 Jul</span></div>
+            {% else %}<div class="hint">Log at least two readings to see a trend.</div>{% endif %}
+            <div class="axis">{% for l in series.weight.labels %}<span>{{ l }}</span>{% endfor %}</div>
           </div>
         </div>
       </div>
 
       <div class="grid cols3">
         <div class="panel">
-          <div class="p-title"><svg class="ic"><use href="#i-activity"/></svg> Recent Activity <a class="more" href="#">View all <svg class="ic"><use href="#i-arrow-right"/></svg></a></div>
+          <div class="p-title"><svg class="ic"><use href="#i-activity"/></svg> Recent Activity</div>
           <div class="p-body">
-            <div class="act"><span class="ai tint-green"><svg class="ic"><use href="#i-heart"/></svg></span><div><div class="t">Blood pressure logged</div><div class="s">Today, 7:45 AM</div></div></div>
-            <div class="act"><span class="ai tint-blue"><svg class="ic"><use href="#i-upload-cloud"/></svg></span><div><div class="t">Prescription uploaded</div><div class="s">Yesterday, 6:20 PM</div></div></div>
-            <div class="act"><span class="ai tint-orange"><svg class="ic"><use href="#i-pill"/></svg></span><div><div class="t">Medicine reminder updated</div><div class="s">Yesterday, 8:00 AM</div></div></div>
-            <div class="act"><span class="ai tint-purple"><svg class="ic"><use href="#i-calendar-check"/></svg></span><div><div class="t">Appointment booked</div><div class="s">01 Jul 2026, 5:30 PM</div></div></div>
+            {% for a in activity %}
+            <div class="act"><span class="ai {{ a.tint }}"><svg class="ic"><use href="#{{ a.icon }}"/></svg></span>
+              <div><div class="t">{{ a.title }}</div><div class="s">{{ a.when|date:"j M Y, g:i A" }}</div></div></div>
+            {% empty %}
+            <p style="color:var(--muted);font-size:13.5px;">Nothing logged yet. Start by adding a vitals reading.</p>
+            {% endfor %}
           </div>
         </div>
+
         <div class="panel">
-          <div class="p-title"><svg class="ic"><use href="#i-target"/></svg> Today's Goals <a class="more" href="#">Edit goals <svg class="ic"><use href="#i-arrow-right"/></svg></a></div>
+          <div class="p-title"><svg class="ic"><use href="#i-target"/></svg> Today's Goals <a class="more" href="{% url 'health_lifestyle' %}">Log <svg class="ic"><use href="#i-arrow-right"/></svg></a></div>
           <div class="p-body">
-            <div class="goal"><div class="g-top"><svg class="ic" style="color:#3b82f6;"><use href="#i-droplet"/></svg><span class="g-name">Drink 8 glasses of water</span><span class="g-val">5 / 8</span></div><div class="bar"><span style="width:62%;background:#3b82f6;"></span></div></div>
-            <div class="goal"><div class="g-top"><svg class="ic" style="color:#22c55e;"><use href="#i-footprints"/></svg><span class="g-name">Walk 8,000 steps</span><span class="g-val">6,520 / 8,000</span></div><div class="bar"><span style="width:81%;background:#22c55e;"></span></div></div>
-            <div class="goal"><div class="g-top"><svg class="ic" style="color:#8b5cf6;"><use href="#i-moon"/></svg><span class="g-name">Sleep 8 hours</span><span class="g-val">7 h 15 m / 8 h</span></div><div class="bar"><span style="width:90%;background:#8b5cf6;"></span></div></div>
-            <div class="goal"><div class="g-top"><svg class="ic" style="color:#f59e0b;"><use href="#i-pill"/></svg><span class="g-name">Take all medicines</span><span class="g-val">2 / 3</span></div><div class="bar"><span style="width:66%;background:#f59e0b;"></span></div></div>
+            {% for g in goals %}
+            <div class="goal">
+              <div class="g-top"><svg class="ic" style="color:{{ g.colour }};"><use href="#{{ g.icon }}"/></svg>
+                <span class="g-name">{{ g.name }}</span><span class="g-val">{{ g.value }}</span></div>
+              <div class="bar"><span style="width:{{ g.pct }}%;background:{{ g.colour }};"></span></div>
+            </div>
+            {% endfor %}
           </div>
         </div>
+
         <div class="panel">
-          <div class="p-title"><svg class="ic"><use href="#i-clock"/></svg> Upcoming Reminders <a class="more" href="#">View all <svg class="ic"><use href="#i-arrow-right"/></svg></a></div>
+          <div class="p-title"><svg class="ic"><use href="#i-clock"/></svg> Today's Medicines <a class="more" href="{% url 'health_medications' %}">All <svg class="ic"><use href="#i-arrow-right"/></svg></a></div>
           <div class="p-body">
-            <div class="rem"><span class="ri tint-orange"><svg class="ic"><use href="#i-pill"/></svg></span><div><div class="t">Medicine: Metformin</div><div class="s">8:00 AM</div></div><span class="chev"><svg class="ic"><use href="#i-chevron-right"/></svg></span></div>
-            <div class="rem hl"><span class="ri tint-red"><svg class="ic"><use href="#i-flask"/></svg></span><div><div class="t">Lab Test</div><div class="s">05 Jul 2026</div></div><span class="chev"><svg class="ic"><use href="#i-chevron-right"/></svg></span></div>
-            <div class="rem"><span class="ri tint-blue"><svg class="ic"><use href="#i-calendar-days"/></svg></span><div><div class="t">Appointment</div><div class="s">04 Jul 2026, 10:30 AM</div></div><span class="chev"><svg class="ic"><use href="#i-chevron-right"/></svg></span></div>
+            {% for d in todays_doses %}
+            <div class="rem {% if not d.taken %}hl{% endif %}">
+              <span class="ri {% if d.taken %}tint-green{% else %}tint-orange{% endif %}"><svg class="ic"><use href="#i-pill"/></svg></span>
+              <div><div class="t">{{ d.medication.name }} {{ d.medication.dose }}</div>
+                <div class="s">{{ d.medication.schedule }}</div></div>
+              <span class="pill {% if d.taken %}ok{% else %}warn{% endif %}">{% if d.taken %}Taken{% else %}Due{% endif %}</span>
+            </div>
+            {% empty %}
+            <p style="color:var(--muted);font-size:13.5px;">No active medicines. Add one from the medicines page.</p>
+            {% endfor %}
           </div>
         </div>
       </div>
 
-      <div class="tip">
-        <svg class="tip-ill left" viewBox="0 0 92 92" fill="none">
-          <rect x="30" y="26" width="20" height="46" rx="6" fill="#bae6fd" stroke="#38bdf8" stroke-width="2"/>
-          <rect x="34" y="18" width="12" height="10" rx="2" fill="#7dd3fc"/>
-          <rect x="30" y="46" width="20" height="26" rx="6" fill="#38bdf8" opacity=".55"/>
-          <rect x="56" y="40" width="22" height="30" rx="4" fill="#e0f2fe" stroke="#38bdf8" stroke-width="2"/>
-          <rect x="56" y="56" width="22" height="14" rx="3" fill="#7dd3fc" opacity=".6"/>
-        </svg>
-        <div class="tip-body">
-          <h4>Today's Wellness Tip <svg class="ic" style="color:#16a34a;width:18px;height:18px;"><use href="#i-leaf"/></svg></h4>
-          <p>Stay hydrated! Drinking enough water helps your body function better.</p>
-        </div>
-        <svg class="tip-ill right" viewBox="0 0 150 92" fill="none">
-          <ellipse cx="75" cy="80" rx="46" ry="7" fill="#34d399" opacity=".25"/>
-          <circle cx="75" cy="30" r="11" fill="#34d399"/>
-          <path d="M60 74c0-13 7-22 15-22s15 9 15 22z" fill="#10b981"/>
-          <path d="M60 68c-10 2-18 6-22 12 8 1 16 0 22-4z" fill="#6ee7b7"/>
-          <path d="M90 68c10 2 18 6 22 12-8 1-16 0-22-4z" fill="#6ee7b7"/>
-          <path d="M120 44c8-2 15 0 20 6-8 1-14 4-18 10-2-7-2-11-2-16z" fill="#a7f3d0"/>
-          <path d="M30 44c-8-2-15 0-20 6 8 1 14 4 18 10 2-7 2-11 2-16z" fill="#a7f3d0"/>
-        </svg>
-      </div>
+      {% if insights %}
+      <div class="panel" style="margin-top:22px;"><div class="p-body tall">
+        <h3 class="p-h"><svg class="ic"><use href="#i-sparkles"/></svg> Why we're saying that</h3>
+        <p style="color:var(--muted);font-size:13.5px;margin:0 0 12px;">Every observation above comes from a rule you can inspect &mdash; here is the evidence behind each one.</p>
+        <table class="dtable">
+          <thead><tr><th>Level</th><th>Observation</th><th>Evidence</th></tr></thead>
+          <tbody>
+            {% for i in insights %}
+            <tr>
+              <td><span class="pill {% if i.level == 'CRITICAL' %}danger{% elif i.level == 'WARNING' %}warn{% else %}muted{% endif %}">{{ i.get_level_display }}</span></td>
+              <td>{{ i.text }}</td>
+              <td style="color:var(--muted);font-size:12.5px;">{{ i.evidence }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div></div>
+      {% endif %}
+
 {% endblock %}

@@ -1,5 +1,5 @@
 {% extends 'base_dashboard.html' %}
-{% block title %}Medications &middot; Smart Health Companion{% endblock %}
+{% block title %}Medications &middot; CareNest{% endblock %}
 {% block sidebar %}{% include 'partials/_sidebar.html' with active='medicines' %}{% endblock %}
 
 {% block dashboard_content %}
@@ -7,56 +7,78 @@
       <div class="page-head">
         <span class="chip-role">Patient</span>
         <h1>Medications</h1>
-        <div class="page-sub">Manage active medicines, upload a prescription for AI extraction, and get automatic drug-interaction checks.</div>
+        <div class="page-sub">Manage your medicines and tick off each dose as you take it. Adherence feeds into your health score.</div>
       </div>
 
-      <div class="callout info">
-        <svg class="ic"><use href="#i-sparkles"/></svg>
-        <div class="c-body"><strong>Prototype page.</strong> The upload and confirm actions are disabled in this preview.</div>
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
       </div>
+      {% endfor %}
 
-      <div class="grid g-2" style="margin-bottom:22px;">
-        <div class="panel"><div class="p-body tall">
-          <h3 class="p-h"><svg class="ic"><use href="#i-pill"/></svg> Active medications</h3>
-          {% for m in active %}
-          <div class="lrow">
-            <span class="ri tint-green" style="width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:0 0 40px;"><svg class="ic"><use href="#i-pill"/></svg></span>
-            <div class="grow">
-              <div class="t">{{ m.name }} <span style="color:var(--muted);font-weight:600;">{{ m.dose }}</span></div>
-              <div class="s">{{ m.schedule }}</div>
+      {% if adherence is not None %}
+      <div class="callout {% if adherence >= 80 %}mint{% else %}warn{% endif %}">
+        <svg class="ic"><use href="#i-target"/></svg>
+        <div class="c-body"><strong>{{ adherence }}% adherence</strong> over the last 14 days.</div>
+      </div>
+      {% endif %}
+
+      <div class="grid g-8-4">
+        <div>
+          <div class="panel" style="margin-bottom:20px;"><div class="p-body tall">
+            <h3 class="p-h"><svg class="ic"><use href="#i-pill"/></svg> Active medicines &mdash; today ({{ today|date:"j M" }})</h3>
+            {% for row in rows %}
+            <div class="lrow">
+              <span class="ri {% if row.dose.taken %}tint-green{% else %}tint-orange{% endif %}" style="width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:0 0 40px;">
+                <svg class="ic"><use href="#i-pill"/></svg></span>
+              <div class="grow">
+                <div class="t">{{ row.med.name }} <span style="color:var(--muted);font-weight:600;">{{ row.med.dose }}</span></div>
+                <div class="s">{{ row.med.schedule }} &middot; Refill: {{ row.refill_in }}</div>
+              </div>
+              <form method="post" style="display:flex;gap:8px;align-items:center;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="toggle_dose">
+                <input type="hidden" name="dose_id" value="{{ row.dose.id }}">
+                <button type="submit" class="btn {% if row.dose.taken %}btn-ghost{% else %}btn-green{% endif %}" style="padding:7px 12px;font-size:12.5px;">
+                  {% if row.dose.taken %}Undo{% else %}<svg class="ic"><use href="#i-check"/></svg> Mark taken{% endif %}
+                </button>
+              </form>
+              <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="stop">
+                <input type="hidden" name="medication_id" value="{{ row.med.id }}">
+                <button type="submit" class="btn btn-danger-ghost" style="padding:7px 12px;font-size:12.5px;">Stop</button>
+              </form>
             </div>
-            <span class="pill muted">Refill in {{ m.refill_in }}</span>
-          </div>
-          {% endfor %}
-        </div></div>
+            {% empty %}
+            <p style="color:var(--muted);font-size:13.5px;">No active medicines yet &mdash; add your first one using the form.</p>
+            {% endfor %}
+          </div></div>
+
+          {% if past %}
+          <div class="panel"><div class="p-body tall">
+            <h3 class="p-h"><svg class="ic"><use href="#i-clock"/></svg> No longer taking</h3>
+            {% for m in past %}
+            <div class="kv"><span class="k">{{ m.name }} {{ m.dose }}</span>
+              <span class="v" style="color:var(--muted);font-weight:600;">Started {{ m.start_date|date:"j M Y" }}</span></div>
+            {% endfor %}
+          </div></div>
+          {% endif %}
+        </div>
 
         <div class="panel"><div class="p-body tall">
-          <h3 class="p-h"><svg class="ic"><use href="#i-upload-cloud"/></svg> Upload a prescription</h3>
-          <p style="color:var(--muted);font-size:13.5px;margin:0 0 14px;">Take a photo of a prescription or lab report. OCR converts it to text, then an LLM extracts the structured medicine details below for you to confirm before saving.</p>
-          <div class="field"><input type="file" class="inp" disabled></div>
-          <button type="button" class="btn btn-teal block is-disabled" disabled>Upload &amp; extract <svg class="ic"><use href="#i-arrow-right"/></svg></button>
-          <div class="hint">Disabled in preview.</div>
+          <h3 class="p-h"><svg class="ic"><use href="#i-pill"/></svg> Add a medicine</h3>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add">
+            <div class="field"><label>Medicine name</label><input type="text" name="name" class="inp" placeholder="e.g. Metformin" required></div>
+            <div class="field"><label>Dose</label><input type="text" name="dose" class="inp" placeholder="e.g. 500 mg" required></div>
+            <div class="field"><label>Schedule</label><input type="text" name="schedule" class="inp" placeholder="e.g. Twice daily, with meals" required></div>
+            <div class="field"><label>Start date</label><input type="date" name="start_date" class="inp" value="{{ today|date:'Y-m-d' }}" required></div>
+            <div class="field"><label>Next refill date (optional)</label><input type="date" name="next_refill_date" class="inp"></div>
+            <button type="submit" class="btn btn-teal block">Add medicine</button>
+          </form>
         </div></div>
-      </div>
-
-      <div class="panel" style="margin-bottom:22px;"><div class="p-body tall">
-        <h3 class="p-h"><svg class="ic"><use href="#i-sparkles"/></svg> AI extraction preview</h3>
-        <p style="color:var(--muted);font-size:13.5px;margin:0 0 12px;">Example of what the OCR &rarr; LLM pipeline returns from an uploaded prescription image:</p>
-        <div class="callout muted"><svg class="ic"><use href="#i-file-text"/></svg><div class="c-body"><div style="font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:4px;">Raw OCR text</div><span style="white-space:pre-wrap;font-size:13px;">{{ extraction_demo.raw_text }}</span></div></div>
-        <table class="dtable">
-          <thead><tr><th>Medicine</th><th>Dose</th><th>Duration</th><th>Extraction confidence</th></tr></thead>
-          <tbody>
-            {% for row in extraction_demo.extracted %}
-            <tr><td style="font-weight:700;">{{ row.medicine }}</td><td>{{ row.dose }}</td><td>{{ row.duration }}</td><td><span class="pill ok">{{ row.confidence }}</span></td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        <button type="button" class="btn btn-green is-disabled" style="margin-top:14px;" disabled><svg class="ic"><use href="#i-check"/></svg> Confirm &amp; save</button>
-      </div></div>
-
-      <div class="callout danger">
-        <svg class="ic"><use href="#i-shield-alert"/></svg>
-        <div class="c-body"><strong>Drug interaction warning (example).</strong> {{ interaction_warning.drug_a }} + {{ interaction_warning.drug_b }}: {{ interaction_warning.note }}</div>
       </div>
 
 {% endblock %}

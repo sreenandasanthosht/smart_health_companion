@@ -1,5 +1,5 @@
 {% extends 'base_dashboard.html' %}
-{% block title %}Lifestyle &amp; Wellness &middot; Smart Health Companion{% endblock %}
+{% block title %}Lifestyle &amp; Wellness &middot; CareNest{% endblock %}
 {% block sidebar %}{% include 'partials/_sidebar.html' with active='wellness' %}{% endblock %}
 
 {% block dashboard_content %}
@@ -7,35 +7,65 @@
       <div class="page-head">
         <span class="chip-role">Patient</span>
         <h1>Lifestyle &amp; Wellness</h1>
-        <div class="page-sub">Log daily sleep, hydration and activity to build a picture of your everyday habits.</div>
+        <div class="page-sub">Log daily sleep, hydration, steps and activity to build a picture of your everyday habits.</div>
       </div>
 
-      <div class="callout info">
-        <svg class="ic"><use href="#i-sparkles"/></svg>
-        <div class="c-body"><strong>Prototype page.</strong> Placeholder entries shown &mdash; saving is disabled in this preview.</div>
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
+
+      <div class="grid stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:22px;">
+        <div class="card stat">
+          <div class="top"><span class="chip purple"><svg class="ic"><use href="#i-moon"/></svg></span><div class="label">Average sleep</div></div>
+          <div class="big">{% if avg_sleep %}{{ avg_sleep }} h{% else %}&mdash;{% endif %}</div>
+          <div class="meta">Across your logged nights</div>
+        </div>
+        <div class="card stat">
+          <div class="top"><span class="chip blue"><svg class="ic"><use href="#i-droplet"/></svg></span><div class="label">Average water</div></div>
+          <div class="big">{% if avg_water %}{{ avg_water }} L{% else %}&mdash;{% endif %}</div>
+          <div class="meta">Target is 2.0 litres a day</div>
+        </div>
+        <div class="card stat">
+          <div class="top"><span class="chip green"><svg class="ic"><use href="#i-footprints"/></svg></span><div class="label">Average steps</div></div>
+          <div class="big">{% if avg_steps %}{{ avg_steps }}{% else %}&mdash;{% endif %}</div>
+          <div class="meta">Target is 8,000 a day</div>
+        </div>
       </div>
 
       <div class="grid g-8-4">
         <div class="panel"><div class="p-body tall">
           <h3 class="p-h"><svg class="ic"><use href="#i-activity"/></svg> Recent entries</h3>
           <table class="dtable">
-            <thead><tr><th>Date</th><th>Sleep</th><th>Water intake</th><th>Activity</th></tr></thead>
+            <thead><tr><th>Date</th><th>Sleep</th><th>Water</th><th>Steps</th><th>Activity</th></tr></thead>
             <tbody>
-              {% for e in entries %}
-              <tr><td>{{ e.date }}</td><td>{{ e.sleep }}</td><td>{{ e.water }}</td><td>{{ e.activity }}</td></tr>
+              {% for e in logs %}
+              <tr>
+                <td>{{ e.date|date:"j M Y" }}</td>
+                <td>{% if e.sleep_hours %}{{ e.sleep_hours }} h{% else %}&mdash;{% endif %}</td>
+                <td>{% if e.water_litres %}{{ e.water_litres }} L{% else %}&mdash;{% endif %}</td>
+                <td>{% if e.steps %}{{ e.steps }}{% else %}&mdash;{% endif %}</td>
+                <td>{{ e.activity_note|default:"&mdash;" }}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="5" style="color:var(--muted);">Nothing logged yet.</td></tr>
               {% endfor %}
             </tbody>
           </table>
         </div></div>
 
         <div class="panel"><div class="p-body tall">
-          <h3 class="p-h"><svg class="ic"><use href="#i-droplet"/></svg> Log today</h3>
-          <form>
-            <div class="field"><label>Sleep (hours)</label><input type="number" step="0.1" class="inp" placeholder="e.g. 7.0"></div>
-            <div class="field"><label>Water intake (L)</label><input type="number" step="0.1" class="inp" placeholder="e.g. 2.0"></div>
-            <div class="field"><label>Activity</label><input type="text" class="inp" placeholder="e.g. 30 min walk"></div>
-            <button type="button" class="btn btn-teal block">Save entry</button>
-            <div class="hint">Saving is disabled in this preview.</div>
+          <h3 class="p-h"><svg class="ic"><use href="#i-droplet"/></svg> Log a day</h3>
+          <form method="post">
+            {% csrf_token %}
+            <div class="field"><label>Date</label><input type="date" name="date" class="inp" value="{{ today }}"></div>
+            <div class="field"><label>Sleep (hours)</label><input type="number" step="0.1" name="sleep_hours" class="inp" placeholder="e.g. 7.0"></div>
+            <div class="field"><label>Water intake (litres)</label><input type="number" step="0.1" name="water_litres" class="inp" placeholder="e.g. 2.0"></div>
+            <div class="field"><label>Steps</label><input type="number" name="steps" class="inp" placeholder="e.g. 8000"></div>
+            <div class="field"><label>Activity</label><input type="text" name="activity_note" class="inp" placeholder="e.g. 30 min walk"></div>
+            <button type="submit" class="btn btn-teal block">Save entry</button>
+            <div class="hint">Saving again for the same date updates that day's entry.</div>
           </form>
         </div></div>
       </div>

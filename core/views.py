@@ -7,8 +7,8 @@ from django.shortcuts import render
 
 def home(request):
     context = {
-        'project_name': 'Smart Health Companion',
-        'tagline': 'An Intelligent Integrated Health Management Ecosystem',
+        'project_name': 'CareNest',
+        'tagline': 'Where Care Continues',
         'features': [
             {
                 'icon': '\U0001FA7A',

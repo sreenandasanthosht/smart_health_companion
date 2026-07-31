@@ -1,5 +1,5 @@
 {% extends 'base_auth.html' %}
-{% block title %}Register &middot; Smart Health Companion{% endblock %}
+{% block title %}Register &middot; CareNest{% endblock %}
 {% block side_title %}Create your account.{% endblock %}
 {% block side_text %}Choose the role that fits you &mdash; the fields and dashboard shown next adapt to it.{% endblock %}
 
@@ -7,16 +7,19 @@
       <h1 class="a-title">Create your account</h1>
       <p class="a-sub">Choose the role that fits you &mdash; patient, caregiver or provider.</p>
 
-      <div class="callout info">
-        <svg class="ic"><use href="#i-sparkles"/></svg>
-        <div class="c-body"><strong>Prototype.</strong> Nothing is saved yet &mdash; continuing takes you to the onboarding preview.</div>
+      {% if form.non_field_errors %}
+      <div class="callout danger">
+        <svg class="ic"><use href="#i-shield-alert"/></svg>
+        <div class="c-body">{{ form.non_field_errors }}</div>
       </div>
+      {% endif %}
 
       <div class="panel"><div class="p-body" style="padding:24px;">
-        <form method="post" novalidate>
+        <form method="post" novalidate id="register-form">
           {% csrf_token %}
-          <div class="field"><label>{{ form.full_name.label }}</label>{{ form.full_name }}</div>
-          <div class="field"><label>{{ form.email.label }}</label>{{ form.email }}</div>
+          <div class="field"><label>{{ form.full_name.label }}</label>{{ form.full_name }}{{ form.full_name.errors }}</div>
+          <div class="field"><label>{{ form.email.label }}</label>{{ form.email }}{{ form.email.errors }}</div>
+          <div class="field"><label>Phone number</label>{{ form.phone_number }}{{ form.phone_number.errors }}</div>
           <div class="field">
             <label>I am a&hellip;</label>
             <div class="role-pick">
@@ -25,12 +28,38 @@
               {% endfor %}
             </div>
           </div>
+          <div class="field" id="caregiver-field" style="display:none;">
+            <label>{{ form.caregiver_patient_id.label }}</label>
+            {{ form.caregiver_patient_id }}{{ form.caregiver_patient_id.errors }}
+          </div>
+          <div class="field" id="provider-field" style="display:none;">
+            <label>Provider type</label>
+            {{ form.provider_type }}{{ form.provider_type.errors }}
+          </div>
           <div class="grid g-2" style="gap:14px;">
-            <div class="field"><label>{{ form.password.label }}</label>{{ form.password }}</div>
-            <div class="field"><label>{{ form.confirm_password.label }}</label>{{ form.confirm_password }}</div>
+            <div class="field"><label>{{ form.password.label }}</label>{{ form.password }}{{ form.password.errors }}</div>
+            <div class="field"><label>{{ form.confirm_password.label }}</label>{{ form.confirm_password }}{{ form.confirm_password.errors }}</div>
           </div>
           <button type="submit" class="btn btn-teal block" style="margin-top:4px;">Create account &amp; continue</button>
         </form>
       </div></div>
       <div class="auth-foot">Already have an account? <a href="{% url 'login' %}">Log in</a></div>
+
+      <script>
+        (function () {
+          var form = document.getElementById('register-form');
+          var caregiverField = document.getElementById('caregiver-field');
+          var providerField = document.getElementById('provider-field');
+          function updateFields() {
+            var checked = form.querySelector('input[name="role"]:checked');
+            var role = checked ? checked.value : '';
+            caregiverField.style.display = (role === 'CAREGIVER') ? '' : 'none';
+            providerField.style.display = (role === 'PROVIDER') ? '' : 'none';
+          }
+          Array.prototype.forEach.call(form.querySelectorAll('input[name="role"]'), function (r) {
+            r.addEventListener('change', updateFields);
+          });
+          updateFields();
+        })();
+      </script>
 {% endblock %}

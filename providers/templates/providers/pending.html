@@ -1,39 +1,91 @@
 {% extends 'base_dashboard.html' %}
-{% block title %}Verification Pending &middot; Smart Health Companion{% endblock %}
+{% block title %}Verification Status &middot; CareNest{% endblock %}
 {% block sidebar %}{% include 'partials/_sidebar_provider.html' with active='pending' %}{% endblock %}
-{% block topbar_initials %}AN{% endblock %}
-{% block topbar_name %}Provider{% endblock %}
-{% block topbar_sub %}Verification pending{% endblock %}
 
 {% block dashboard_content %}
 
       <div class="page-head">
         <span class="chip-role">Provider</span>
-        <h1>Account pending verification</h1>
-        <div class="page-sub">Submitted on {{ submitted_on }}. An administrator reviews every provider submission before the listing goes live. You'll be notified once it's approved.</div>
+        <h1>Verification status</h1>
+        <div class="page-sub">An administrator reviews every provider submission before the listing goes live.</div>
       </div>
+
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
+
+      {% if not profile %}
+      <div class="callout danger"><svg class="ic"><use href="#i-shield-alert"/></svg>
+        <div class="c-body">No provider profile found for your account. Contact support.</div></div>
+      {% else %}
+
+      {% if profile.verification_status == 'NEEDS_INFO' %}
+      <div class="callout danger"><svg class="ic"><use href="#i-shield-alert"/></svg>
+        <div class="c-body"><strong>More information needed.</strong> {{ profile.verification_note }}</div></div>
+      {% endif %}
 
       <div class="grid g-7-5">
         <div class="panel"><div class="p-body tall" style="text-align:center;padding:34px 24px;">
-          <div class="shc-status-ic" style="width:76px;height:76px;border-radius:22px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;background:#fef3e2;color:#d97706;">
-            <svg class="ic" style="width:34px;height:34px;"><use href="#i-clock"/></svg>
+          <div style="width:76px;height:76px;border-radius:22px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;
+            {% if profile.is_verified %}background:#dcfce7;color:#16a34a;{% elif profile.verification_status == 'NEEDS_INFO' %}background:#fee2e2;color:#dc2626;{% else %}background:#fef3e2;color:#d97706;{% endif %}">
+            <svg class="ic" style="width:34px;height:34px;"><use href="#{% if profile.is_verified %}i-check{% else %}i-clock{% endif %}"/></svg>
           </div>
-          <div style="font-size:18px;font-weight:800;margin-bottom:6px;">Review in progress</div>
-          <p style="color:var(--muted);font-size:14px;max-width:420px;margin:0 auto;">Most submissions are reviewed within 1&ndash;2 business days. No action is needed from you right now.</p>
-          <span class="pill warn" style="margin-top:16px;"><svg class="ic" style="width:13px;height:13px;"><use href="#i-clock"/></svg> Awaiting admin approval</span>
+          <div style="font-size:18px;font-weight:800;margin-bottom:6px;">{{ profile.get_verification_status_display }}</div>
+          <p style="color:var(--muted);font-size:14px;max-width:420px;margin:0 auto;">
+            {% if profile.is_verified %}
+              Your listing is live in the provider directory and patients can book with you.
+            {% elif profile.verification_status == 'NEEDS_INFO' %}
+              Update your details below and resubmit for review.
+            {% else %}
+              Submitted {{ profile.submitted_at|date:"j M Y" }}. Most submissions are reviewed within 1&ndash;2 business days.
+            {% endif %}
+          </p>
+          <span class="pill {% if profile.is_verified %}ok{% elif profile.verification_status == 'NEEDS_INFO' %}danger{% else %}warn{% endif %}" style="margin-top:16px;">
+            {{ profile.get_verification_status_display }}</span>
+
+          <div style="margin-top:22px;text-align:left;">
+            <h3 class="p-h"><svg class="ic"><use href="#i-file-text"/></svg> Documents</h3>
+            {% for label, submitted in profile.documents_submitted %}
+            <div class="lrow" style="border-radius:12px;">
+              <span class="ri {% if submitted %}tint-green{% else %}tint-orange{% endif %}" style="width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:0 0 38px;">
+                <svg class="ic"><use href="#{% if submitted %}i-check{% else %}i-clock{% endif %}"/></svg></span>
+              <div class="grow"><div class="t">{{ label }}</div></div>
+              <span class="pill {% if submitted %}ok{% else %}muted{% endif %}">{% if submitted %}Received{% else %}Missing{% endif %}</span>
+            </div>
+            {% endfor %}
+          </div>
         </div></div>
 
         <div class="panel"><div class="p-body tall">
-          <h3 class="p-h"><svg class="ic"><use href="#i-file-text"/></svg> Documents submitted</h3>
-          {% for d in documents %}
-          <div class="lrow" style="border-radius:12px;">
-            <span class="ri tint-green" style="width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:0 0 38px;"><svg class="ic"><use href="#i-check"/></svg></span>
-            <div class="grow"><div class="t">{{ d }}</div></div>
-            <span class="pill ok">Received</span>
-          </div>
-          {% endfor %}
-          <div class="callout muted" style="margin-top:14px;margin-bottom:0;"><svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">In the real system, admins review submissions through Django's built-in admin panel &mdash; no custom approval screen needed.</div></div>
+          <h3 class="p-h"><svg class="ic"><use href="#i-stethoscope"/></svg> Your details</h3>
+          <form method="post">
+            {% csrf_token %}
+            <div class="field"><label>Specialty or service</label>
+              <input type="text" name="specialty" class="inp" value="{{ profile.specialty }}" placeholder="e.g. General Physician"></div>
+            <div class="field"><label>Clinic / organisation name</label>
+              <input type="text" name="clinic_name" class="inp" value="{{ profile.clinic_name }}"></div>
+            <div class="field"><label>Years of experience</label>
+              <input type="number" name="years_experience" class="inp" value="{{ profile.years_experience|default_if_none:'' }}"></div>
+            <div class="field"><label>Registration / licence number</label>
+              <input type="text" name="registration_number" class="inp" value="{{ profile.registration_number }}"></div>
+            <div class="field"><label>Address</label>
+              <input type="text" name="address" class="inp" value="{{ profile.address }}"></div>
+            <div class="field"><label>Documents provided</label>
+              <label style="display:flex;align-items:center;gap:9px;font-weight:600;margin-bottom:8px;">
+                <input type="checkbox" name="doc_registration_certificate" {% if profile.doc_registration_certificate %}checked{% endif %}> Registration certificate</label>
+              <label style="display:flex;align-items:center;gap:9px;font-weight:600;margin-bottom:8px;">
+                <input type="checkbox" name="doc_government_id" {% if profile.doc_government_id %}checked{% endif %}> Government ID</label>
+              <label style="display:flex;align-items:center;gap:9px;font-weight:600;margin-bottom:8px;">
+                <input type="checkbox" name="doc_organization_info" {% if profile.doc_organization_info %}checked{% endif %}> Clinic / organisation info</label>
+              <label style="display:flex;align-items:center;gap:9px;font-weight:600;">
+                <input type="checkbox" name="doc_address_proof" {% if profile.doc_address_proof %}checked{% endif %}> Address proof</label>
+            </div>
+            <button type="submit" class="btn btn-teal block">Submit for review</button>
+          </form>
         </div></div>
       </div>
+      {% endif %}
 
 {% endblock %}

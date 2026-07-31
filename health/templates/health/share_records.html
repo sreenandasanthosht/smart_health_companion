@@ -1,5 +1,5 @@
 {% extends 'base_dashboard.html' %}
-{% block title %}Share Records &middot; Smart Health Companion{% endblock %}
+{% block title %}Share Records &middot; CareNest{% endblock %}
 {% block sidebar %}{% include 'partials/_sidebar.html' with active='sharing' %}{% endblock %}
 
 {% block dashboard_content %}
@@ -7,12 +7,18 @@
       <div class="page-head">
         <span class="chip-role">Patient</span>
         <h1>Share Records</h1>
-        <div class="page-sub">Generate a one-time, time-limited passcode so a provider can view specific records. Every share and revoke is written to an audit log. Mental-health entries are never included.</div>
+        <div class="page-sub">Grant a provider or caregiver access to specific categories of your data, for as long as you choose. Every grant and revoke is written to the audit log.</div>
       </div>
 
-      <div class="callout info">
-        <svg class="ic"><use href="#i-sparkles"/></svg>
-        <div class="c-body"><strong>Prototype page.</strong> Generating and revoking shares is disabled in this preview.</div>
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
+
+      <div class="callout muted">
+        <svg class="ic"><use href="#i-shield-alert"/></svg>
+        <div class="c-body">Mental-health entries can never be shared &mdash; they are excluded from every option below by design.</div>
       </div>
 
       <div class="grid g-7-5">
@@ -22,11 +28,17 @@
             {% for s in active_shares %}
             <div class="lrow">
               <div class="grow">
-                <div class="t">{{ s.with }}</div>
-                <div class="s">Scope: {{ s.scope }} &middot; Expires {{ s.expires }}</div>
-                <code>{{ s.code }}</code>
+                <div class="t">{{ s.recipient.display_name }}</div>
+                <div class="s">Scope: {{ s.scope_label }} &middot;
+                  {% if s.expires_at %}Expires {{ s.expires_at|date:"j M Y, g:i A" }}{% else %}No expiry{% endif %}</div>
+                <code>{{ s.passcode }}</code>
               </div>
-              <button type="button" class="btn btn-danger-ghost is-disabled" disabled>Revoke</button>
+              <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="revoke">
+                <input type="hidden" name="grant_id" value="{{ s.id }}">
+                <button type="submit" class="btn btn-danger-ghost">Revoke</button>
+              </form>
             </div>
             {% empty %}
             <p style="color:var(--muted);font-size:13.5px;">No active shares.</p>
@@ -36,25 +48,56 @@
           <div class="panel"><div class="p-body tall">
             <h3 class="p-h"><svg class="ic"><use href="#i-clock"/></svg> Share history</h3>
             {% for h in history %}
-            <div class="kv"><span class="k">{{ h.with }} &middot; {{ h.scope }}</span><span class="v" style="color:var(--muted);font-weight:600;">{{ h.action }} &middot; {{ h.when }}</span></div>
+            <div class="kv">
+              <span class="k">{{ h.recipient.display_name }} &middot; {{ h.scope_label }}</span>
+              <span class="v" style="color:var(--muted);font-weight:600;">
+                {{ h.status_label }} &middot; {{ h.revoked_at|default:h.expires_at|date:"j M Y" }}</span>
+            </div>
+            {% empty %}
+            <p style="color:var(--muted);font-size:13.5px;">Nothing here yet.</p>
             {% endfor %}
           </div></div>
         </div>
 
         <div class="panel"><div class="p-body tall">
           <h3 class="p-h"><svg class="ic"><use href="#i-stethoscope"/></svg> Create a new share</h3>
-          <div class="field"><label>Share with (provider)</label>
-            <select class="inp"><option>Dr. Anjali Nair &mdash; General Physician</option><option>Dr. Rohan Mehta &mdash; Cardiologist</option></select></div>
-          <div class="field"><label>What to include</label>
-            <label style="display:flex;align-items:center;gap:9px;font-weight:600;margin-bottom:8px;"><input type="checkbox" checked disabled> Vitals</label>
-            <label style="display:flex;align-items:center;gap:9px;font-weight:600;margin-bottom:8px;"><input type="checkbox" checked disabled> Medications</label>
-            <label style="display:flex;align-items:center;gap:9px;font-weight:600;margin-bottom:8px;"><input type="checkbox" disabled> Lifestyle logs</label>
-            <label style="display:flex;align-items:center;gap:9px;font-weight:600;color:var(--muted);"><input type="checkbox" disabled> Mental health (never shareable)</label>
-          </div>
-          <div class="field"><label>Expires after</label>
-            <select class="inp"><option>2 hours</option><option>24 hours</option><option>7 days</option></select></div>
-          <button type="button" class="btn btn-teal block is-disabled" disabled>Generate passcode</button>
-          <div class="hint">Disabled in preview.</div>
+          {% if recipients %}
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="grant">
+            <div class="field"><label>Share with</label>
+              <select class="inp" name="recipient" required>
+                <option value="">Choose a person</option>
+                {% for r in recipients %}
+                <option value="{{ r.id }}">{{ r.display_name }} &mdash; {{ r.get_role_display }}</option>
+                {% endfor %}
+              </select></div>
+            <div class="field"><label>What to include</label>
+              <label style="display:flex;align-items:center;gap:9px;font-weight:600;margin-bottom:8px;">
+                <input type="checkbox" name="scope" value="VITALS" checked> Vitals</label>
+              <label style="display:flex;align-items:center;gap:9px;font-weight:600;margin-bottom:8px;">
+                <input type="checkbox" name="scope" value="MEDICATIONS" checked> Medications</label>
+              <label style="display:flex;align-items:center;gap:9px;font-weight:600;margin-bottom:8px;">
+                <input type="checkbox" name="scope" value="RECORDS"> Lab / prescription records</label>
+              <label style="display:flex;align-items:center;gap:9px;font-weight:600;margin-bottom:8px;">
+                <input type="checkbox" name="scope" value="LIFESTYLE"> Lifestyle logs</label>
+              <label style="display:flex;align-items:center;gap:9px;font-weight:600;color:var(--muted);">
+                <input type="checkbox" disabled> Mental health (never shareable)</label>
+            </div>
+            <div class="field"><label>Reason</label>
+              <input type="text" name="context" class="inp" placeholder="e.g. Pre-visit snapshot"></div>
+            <div class="field"><label>Expires after</label>
+              <select class="inp" name="expires_in">
+                <option value="2">2 hours</option>
+                <option value="24">24 hours</option>
+                <option value="168">7 days</option>
+                <option value="never">No expiry (ongoing)</option>
+              </select></div>
+            <button type="submit" class="btn btn-teal block">Generate passcode</button>
+          </form>
+          {% else %}
+          <p style="color:var(--muted);font-size:13.5px;">There is nobody to share with yet. Once a verified provider is listed, or a caregiver link is approved, they'll appear here.</p>
+          {% endif %}
         </div></div>
       </div>
 

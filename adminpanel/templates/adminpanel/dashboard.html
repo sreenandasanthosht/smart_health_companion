@@ -1,29 +1,27 @@
 {% extends 'base_dashboard.html' %}
-{% block title %}Admin Dashboard &middot; Smart Health Companion{% endblock %}
+{% block title %}Admin Dashboard &middot; CareNest{% endblock %}
 {% block sidebar %}{% include 'partials/_sidebar_admin.html' with active='dashboard' %}{% endblock %}
-{% block topbar_initials %}A{% endblock %}
-{% block topbar_name %}{{ admin_name }}{% endblock %}
-{% block topbar_sub %}Administrator{% endblock %}
 
 {% block dashboard_content %}
 
       <div class="page-head">
         <span class="chip-role">Admin</span>
-        <h1>Platform Overview</h1>
-        <div class="page-sub">A snapshot of users, providers and pending work across Smart Health Companion.</div>
+        <h1>Platform overview</h1>
+        <div class="page-sub">Live numbers from the database &mdash; users, verifications and activity across CareNest.</div>
       </div>
 
-      <div class="callout info">
-        <svg class="ic"><use href="#i-sparkles"/></svg>
-        <div class="c-body"><strong>Prototype page.</strong> Numbers below are placeholder data -- real figures arrive once the Admin logic is wired up to the database.</div>
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
       </div>
+      {% endfor %}
 
       <div class="grid stats">
         <div class="card stat">
           <div class="top"><span class="chip blue"><svg class="ic"><use href="#i-users"/></svg></span></div>
           <div class="label">Total users</div>
           <div class="big">{{ total_users }}</div>
-          <a class="link" href="{% url 'admin_users' %}">View users <svg class="ic"><use href="#i-arrow-right"/></svg></a>
+          <a class="link" href="{% url 'admin_users' %}">Manage users <svg class="ic"><use href="#i-arrow-right"/></svg></a>
         </div>
         <div class="card stat">
           <div class="top"><span class="chip green"><svg class="ic"><use href="#i-stethoscope"/></svg></span></div>
@@ -38,35 +36,60 @@
           <a class="link" href="{% url 'admin_verification' %}">Review queue <svg class="ic"><use href="#i-arrow-right"/></svg></a>
         </div>
         <div class="card stat">
-          <div class="top"><span class="chip purple"><svg class="ic"><use href="#i-user"/></svg></span></div>
+          <div class="top"><span class="chip purple"><svg class="ic"><use href="#i-sparkles"/></svg></span></div>
           <div class="label">New sign-ups today</div>
           <div class="big">{{ new_signups_today }}</div>
           <div class="meta">{{ new_signups_breakdown }}</div>
         </div>
       </div>
 
-      <div class="grid g-2">
+      <div class="grid g-7-5" style="margin-top:22px;">
         <div class="panel"><div class="p-body tall">
           <h3 class="p-h"><svg class="ic"><use href="#i-shield-alert"/></svg> Needs attention</h3>
-          {% for n in needs_attention %}
-          <div class="lrow" style="flex-direction:column;align-items:stretch;gap:8px;">
-            <div>
-              <div class="t">{{ n.text }}</div>
-              <div class="s">{{ n.sub }}</div>
-            </div>
-            {% if n.url_name %}<a href="{% url n.url_name %}" class="btn btn-ghost" style="padding:8px 14px;align-self:flex-start;">{{ n.cta }}</a>{% endif %}
+          {% for item in needs_attention %}
+          <div class="lrow">
+            <div class="grow"><div class="t">{{ item.text }}</div><div class="s">{{ item.sub }}</div></div>
+            {% if item.url_name %}
+            <a href="{% url item.url_name %}" class="btn btn-ghost" style="padding:7px 12px;font-size:12.5px;">{{ item.cta }}</a>
+            {% endif %}
           </div>
           {% empty %}
-          <p style="color:var(--muted);font-size:13.5px;">Nothing needs attention right now.</p>
+          <div class="callout mint" style="margin:0;"><svg class="ic"><use href="#i-check"/></svg>
+            <div class="c-body">Nothing needs your attention right now.</div></div>
           {% endfor %}
         </div></div>
 
         <div class="panel"><div class="p-body tall">
           <h3 class="p-h"><svg class="ic"><use href="#i-activity"/></svg> Today at a glance</h3>
           {% for t in today %}
-          <div class="kv"><span class="k">{{ t.sub }}</span><span class="v">{{ t.label }}</span></div>
+          <div class="kv"><span class="k">{{ t.label }}</span>
+            <span class="v" style="color:var(--muted);font-weight:600;">{{ t.sub }}</span></div>
+          {% endfor %}
+          <h3 class="p-h" style="margin-top:18px;"><svg class="ic"><use href="#i-users"/></svg> Users by role</h3>
+          {% for r in role_counts %}
+          <div class="kv"><span class="k">{{ r.role|capfirst }}</span><span class="v">{{ r.n }}</span></div>
           {% endfor %}
         </div></div>
       </div>
+
+      <div class="panel" style="margin-top:22px;"><div class="p-body tall">
+        <h3 class="p-h"><svg class="ic"><use href="#i-clock"/></svg> Latest activity
+          <a class="more" href="{% url 'admin_audit_log' %}">Full audit log <svg class="ic"><use href="#i-arrow-right"/></svg></a></h3>
+        <table class="dtable">
+          <thead><tr><th>When</th><th>Who</th><th>Action</th><th>Target</th></tr></thead>
+          <tbody>
+            {% for e in recent_audit %}
+            <tr>
+              <td>{{ e.created_at|date:"j M, H:i" }}</td>
+              <td>{{ e.actor_label }}</td>
+              <td><span class="pill {{ e.tag }}">{{ e.action }}</span></td>
+              <td style="color:var(--muted);">{{ e.target }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" style="color:var(--muted);">No activity recorded yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div></div>
 
 {% endblock %}

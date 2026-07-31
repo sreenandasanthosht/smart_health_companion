@@ -1,5 +1,6 @@
 """URL map for the health app (patient vitals, medications, lifestyle, mental health, sharing)."""
 from django.urls import path
+
 from . import views
 
 urlpatterns = [
@@ -10,4 +11,6 @@ urlpatterns = [
     path('mental-health/', views.mental_health, name='health_mental_health'),
     path('share/', views.share_records, name='health_share'),
     path('caregiver-dashboard/', views.caregiver_dashboard, name='health_caregiver_dashboard'),
+    path('caregiver-link/', views.caregiver_link_request, name='health_caregiver_link'),
+    path('caregiver-requests/', views.caregiver_requests, name='health_caregiver_requests'),
 ]
