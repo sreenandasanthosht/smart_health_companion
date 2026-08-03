@@ -1,0 +1,192 @@
+erDiagram
+    USER ||--o{ CAREGIVERLINK : "is the patient in"
+    USER ||--o{ CAREGIVERLINK : "is the caregiver in"
+    USER ||--o{ VITALRECORD : "owns"
+    USER ||--o{ VITALRECORD : "entered (entered_by)"
+    USER ||--o{ MEDICATION : "owns"
+    USER ||--o{ LIFESTYLELOG : "owns"
+    USER ||--o{ MOODLOG : "owns (private)"
+    USER ||--o{ CONSENTGRANT : "grants"
+    USER ||--o{ CONSENTGRANT : "receives"
+    USER ||--o{ HEALTHINSIGHT : "has"
+    USER ||--o| PROVIDERPROFILE : "has (providers only)"
+    USER ||--o{ APPOINTMENT : "books"
+    USER ||--o{ NURSEASSIGNMENT : "is the nurse in"
+    USER ||--o{ NURSEASSIGNMENT : "is the patient in"
+    USER ||--o{ NURSINGVISIT : "is the nurse in"
+    USER ||--o{ NURSINGVISIT : "is the patient in"
+    USER ||--o{ AUDITLOG : "acted as"
+
+    MEDICATION     ||--o{ MEDICATIONDOSE : "is ticked off in"
+    PROVIDERPROFILE||--o{ APPOINTMENT    : "receives"
+    VITALRECORD    ||--o| NURSINGVISIT   : "was taken during"
+
+    USER {
+        int      id                PK
+        string   username          UK "email is used as the username"
+        string   password
+        string   email
+        string   first_name
+        string   last_name
+        string   role                  "PATIENT | CAREGIVER | PROVIDER | ADMIN | NURSE"
+        string   unique_id         UK  "10-char CareNest ID, auto-generated"
+        string   phone_number
+        date     date_of_birth
+        string   sex                   "F | M | O"
+        string   blood_group
+        int      height_cm
+        string   address
+        string   emergency_contact
+        bool     is_suspended          "admin can disable without deleting"
+        bool     is_staff
+        bool     is_superuser
+        datetime date_joined
+    }
+
+    CAREGIVERLINK {
+        int      id           PK
+        int      patient_id   FK
+        int      caregiver_id FK
+        string   relationship
+        string   status           "PENDING | APPROVED | REJECTED"
+        datetime requested_at
+        datetime decided_at
+    }
+
+    VITALRECORD {
+        int      id            PK
+        int      patient_id    FK
+        datetime recorded_at
+        int      bp_systolic
+        int      bp_diastolic
+        decimal  blood_sugar
+        decimal  weight_kg
+        int      heart_rate
+        string   status            "NORMAL | WATCH | HIGH - computed on save"
+        string   source            "SELF | NURSE | CAREGIVER - provenance"
+        int      entered_by_id FK  "null when self-recorded"
+    }
+
+    MEDICATION {
+        int    id               PK
+        int    patient_id       FK
+        string name
+        string dose
+        string schedule
+        date   start_date
+        date   next_refill_date
+        bool   active
+    }
+
+    MEDICATIONDOSE {
+        int      id            PK
+        int      medication_id FK
+        date     date              "unique together with medication"
+        bool     taken
+        datetime taken_at
+    }
+
+    LIFESTYLELOG {
+        int     id            PK
+        int     patient_id    FK
+        date    date              "unique together with patient"
+        decimal sleep_hours
+        decimal water_litres
+        int     steps
+        string  activity_note
+    }
+
+    MOODLOG {
+        int    id         PK
+        int    patient_id FK
+        date   date
+        string mood
+        text   note           "NEVER shareable - see note below"
+    }
+
+    CONSENTGRANT {
+        int      id                PK
+        int      patient_id        FK
+        int      recipient_id      FK
+        bool     scope_vitals
+        bool     scope_medications
+        bool     scope_records
+        bool     scope_lifestyle
+        datetime granted_at
+        datetime expires_at            "null = ongoing grant"
+        datetime revoked_at            "null = not withdrawn"
+        string   action_context        "why the grant was made"
+        string   passcode              "auto-generated share code"
+    }
+
+    HEALTHINSIGHT {
+        int      id         PK
+        int      patient_id FK
+        string   level          "INFO | WARNING | CRITICAL"
+        string   text
+        string   evidence       "the data that triggered the rule"
+        datetime created_at
+    }
+
+    PROVIDERPROFILE {
+        int      id                          PK
+        int      user_id                     FK "OneToOne"
+        string   provider_type                  "DOCTOR | CLINIC | HOSPITAL | DIAGNOSTIC_LAB | PHARMACY | DIETICIAN | FITNESS_CENTRE | WELLNESS_CENTRE"
+        string   specialty
+        int      years_experience
+        string   clinic_name
+        string   address
+        string   registration_number
+        bool     doc_registration_certificate
+        bool     doc_government_id
+        bool     doc_organization_info
+        bool     doc_address_proof
+        string   verification_status            "PENDING | VERIFIED | NEEDS_INFO"
+        string   verification_note
+        datetime submitted_at
+        datetime verified_at
+    }
+
+    APPOINTMENT {
+        int      id            PK
+        int      patient_id    FK
+        int      provider_id   FK
+        datetime scheduled_for
+        string   reason
+        string   status            "REQUESTED | CONFIRMED | COMPLETED | DECLINED | CANCELLED"
+        text     provider_note
+        datetime created_at
+    }
+
+    NURSEASSIGNMENT {
+        int    id             PK
+        int    nurse_id       FK
+        int    patient_id     FK
+        date   start_date
+        date   end_date           "null while ongoing"
+        int    assigned_by_id FK  "the admin who created it"
+        string notes
+    }
+
+    NURSINGVISIT {
+        int      id                       PK
+        int      nurse_id                 FK
+        int      patient_id               FK
+        datetime visited_at
+        text     notes
+        string   medications_administered
+        int      vitals_id                FK "the VitalRecord taken during the visit"
+        bool     escalated
+        string   severity                    "ROUTINE | URGENT"
+        string   escalation_reason
+    }
+
+    AUDITLOG {
+        int      id          PK
+        int      actor_id    FK "nullable - survives user deletion"
+        string   actor_label    "denormalised name, kept if the user is removed"
+        string   action
+        string   target
+        string   tag            "ok | warn | danger | muted"
+        datetime created_at
+    }

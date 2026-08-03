@@ -11,6 +11,7 @@
       <a class="nav-item {% if active == 'profile' %}active{% endif %}" href="{% url 'profile' %}"><svg class="ic"><use href="#i-user"/></svg> My Profile</a>
       <a class="nav-item {% if active == 'vitals' %}active{% endif %}" href="{% url 'health_vitals' %}"><svg class="ic"><use href="#i-heart"/></svg> Log Vitals</a>
       <a class="nav-item {% if active == 'medicines' %}active{% endif %}" href="{% url 'health_medications' %}"><svg class="ic"><use href="#i-pill"/></svg> Manage Medicines</a>
+      <a class="nav-item {% if active == 'prescription' %}active{% endif %}" href="{% url 'health_prescription_upload' %}"><svg class="ic"><use href="#i-upload-cloud"/></svg> Upload Prescription</a>
       <a class="nav-item {% if active == 'appointments' %}active{% endif %}" href="{% url 'provider_appointments' %}"><svg class="ic"><use href="#i-calendar-days"/></svg> Appointments</a>
       <a class="nav-item {% if active == 'providers' %}active{% endif %}" href="{% url 'provider_directory' %}"><svg class="ic"><use href="#i-stethoscope"/></svg> Find a Provider</a>
       <a class="nav-item {% if active == 'wellness' %}active{% endif %}" href="{% url 'health_lifestyle' %}"><svg class="ic"><use href="#i-activity"/></svg> Lifestyle</a>

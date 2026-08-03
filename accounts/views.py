@@ -131,6 +131,34 @@ def register_view(request):
     return render(request, 'accounts/register.html', {'form': form, 'roles': PUBLIC_ROLE_CHOICES})
 
 
+def _username_for_login(typed_email):
+    """
+    Turn the email someone typed into the username Django must authenticate.
+
+    Accounts created through registration always have username == email, so
+    the two are interchangeable. Accounts created with `createsuperuser`
+    do not: that command asks for a username and an email separately, so a
+    superuser can end up as username='admin', email='admin@example.com'.
+    Without this lookup such an account can never sign in to the app --
+    typing the username fails email validation, and typing the email finds
+    no matching username.
+
+    Matching on email is tried first; if nothing matches we fall back to
+    treating the input as the username, which keeps the normal case working
+    even before any User rows exist.
+    """
+    match = User.objects.filter(email__iexact=typed_email)
+    if match.count() == 1:
+        return match.first().username
+    if match.count() > 1:
+        # Shouldn't happen (registration blocks duplicate emails), but if it
+        # does, prefer the account whose username is also the email.
+        exact = match.filter(username__iexact=typed_email).first()
+        if exact:
+            return exact.username
+    return typed_email
+
+
 def login_view(request):
     if request.user.is_authenticated:
         return redirect(ROLE_DASHBOARD_URL.get(request.user.role, 'home'))
@@ -140,7 +168,7 @@ def login_view(request):
         if form.is_valid():
             email = form.cleaned_data['email']
             password = form.cleaned_data['password']
-            user = authenticate(request, username=email, password=password)
+            user = authenticate(request, username=_username_for_login(email), password=password)
             if user is None:
                 form.add_error(None, 'Incorrect email or password.')
             elif user.is_suspended:

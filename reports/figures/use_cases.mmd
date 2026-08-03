@@ -1,0 +1,57 @@
+flowchart LR
+    PATIENT([Patient])
+    CAREGIVER([Caregiver])
+    NURSE([Nurse])
+    PROVIDER([Provider])
+    ADMIN([Admin])
+
+    subgraph everyone["Available to every role"]
+        E1[Register / log in]
+        E2[Complete own profile]
+    end
+
+    subgraph selfcare["Patient — self-management"]
+        P1[Log vitals]
+        P2[Manage medicines<br/>and tick daily doses]
+        P3[Log lifestyle]
+        P4[Private mood journal]
+    end
+
+    subgraph consent["Patient — consent and sharing"]
+        S1[Grant a scoped,<br/>time-limited share]
+        S2[Revoke a share]
+        S3[Approve or reject<br/>a caregiver]
+        S4[Book an appointment]
+    end
+
+    subgraph cg["Caregiver"]
+        G1[Monitor a linked patient<br/>within consent]
+    end
+
+    subgraph nurse["Nurse — logging and coordination"]
+        N1[View assigned patients]
+        N2[Log a visit]
+        N3[Record vitals<br/>tagged as nurse-taken]
+        N4[Raise an escalation]
+    end
+
+    subgraph prov["Provider"]
+        V1[Submit verification<br/>documents]
+        V2[Accept or decline<br/>an appointment]
+        V3[Annotate and<br/>complete a visit]
+    end
+
+    subgraph admin["Admin — platform"]
+        A1[Verify a provider]
+        A2[Suspend / reinstate<br/>a user]
+        A3[Assign a nurse]
+        A4[Read the audit log]
+    end
+
+    PATIENT --> selfcare
+    PATIENT --> consent
+    CAREGIVER --> cg
+    NURSE --> nurse
+    PROVIDER --> prov
+    ADMIN --> admin
+    PATIENT & CAREGIVER & NURSE & PROVIDER & ADMIN --> everyone

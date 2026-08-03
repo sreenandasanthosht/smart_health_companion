@@ -248,3 +248,87 @@ class HealthInsight(models.Model):
 
     def __str__(self):
         return f"[{self.level}] {self.text}"
+
+
+class ExtractionJob(models.Model):
+    """
+    One prescription / lab-report upload, processed and discarded.
+
+    The uploaded FILE is never written to storage. It is read into memory,
+    OCR'd, parsed, and the bytes go out of scope when the request ends.
+    Only the structured result and a short audit record persist.
+
+    `raw_text` holds the OCR output while the patient verifies it, and is
+    cleared the moment they confirm or discard -- so even the transcribed
+    text does not linger after it has served its purpose.
+    """
+    class Source(models.TextChoices):
+        PRESCRIPTION = 'PRESCRIPTION', 'Prescription'
+        LAB_REPORT = 'LAB_REPORT', 'Lab report'
+
+    class Status(models.TextChoices):
+        EXTRACTED = 'EXTRACTED', 'Awaiting verification'
+        CONFIRMED = 'CONFIRMED', 'Confirmed'
+        DISCARDED = 'DISCARDED', 'Discarded'
+        FAILED = 'FAILED', 'Extraction failed'
+
+    class Parser(models.TextChoices):
+        LLM = 'LLM', 'LLM'
+        RULES = 'RULES', 'Rule-based'
+        NONE = 'NONE', 'None'
+
+    patient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                                related_name='extraction_jobs')
+    source_type = models.CharField(max_length=12, choices=Source.choices, default=Source.PRESCRIPTION)
+    # Filename only, never a path -- we keep it so the patient can recognise
+    # which upload this was, not so the file can be found again.
+    original_filename = models.CharField(max_length=255, blank=True)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.EXTRACTED)
+    raw_text = models.TextField(blank=True)
+    ocr_confidence = models.FloatField(null=True, blank=True)
+    # Which parser produced the result. Recorded so the report can compare
+    # LLM extraction against the rule-based baseline on the same documents.
+    parser_used = models.CharField(max_length=6, choices=Parser.choices, default=Parser.NONE)
+    parser_note = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    # Proof of the process-and-discard promise: set the moment the in-memory
+    # bytes are released, which is before the response is returned.
+    file_deleted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def clear_text(self):
+        """Drop the transcribed text once it is no longer needed."""
+        if self.raw_text:
+            self.raw_text = ''
+            self.save(update_fields=['raw_text'])
+
+    def __str__(self):
+        return f"{self.get_source_type_display()} for {self.patient} ({self.status})"
+
+
+class ExtractedMedication(models.Model):
+    """One medicine detected in an upload, pending the patient's confirmation."""
+    job = models.ForeignKey(ExtractionJob, on_delete=models.CASCADE, related_name='medications')
+    name = models.CharField(max_length=120)
+    dose = models.CharField(max_length=60, blank=True)
+    frequency = models.CharField(max_length=120, blank=True)
+    duration = models.CharField(max_length=60, blank=True)
+    # 0.0-1.0. Derived from which rule matched, or reported by the LLM.
+    # Never invented: a field the parser could not read gets 0.0.
+    confidence = models.FloatField(default=0.0)
+    confirmed = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-confidence', 'name']
+
+    def confidence_band(self):
+        if self.confidence >= 0.8:
+            return 'high'
+        if self.confidence >= 0.5:
+            return 'medium'
+        return 'low'
+
+    def __str__(self):
+        return f"{self.name} {self.dose}".strip()

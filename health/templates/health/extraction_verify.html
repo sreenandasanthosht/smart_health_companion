@@ -1,0 +1,105 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Check what we found &middot; CareNest{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar.html' with active='prescription' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Patient</span>
+        <h1>Check what we found</h1>
+        <div class="page-sub">Correct anything that's wrong, untick anything that isn't a medicine, then confirm. Nothing has been saved yet.</div>
+      </div>
+
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warn{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
+
+      <div class="callout mint">
+        <svg class="ic"><use href="#i-check"/></svg>
+        <div class="c-body"><strong>Your photo has already been deleted.</strong>
+          It was read at {{ job.file_deleted_at|date:"g:i A" }} and discarded immediately. Only what you confirm below will be kept.</div>
+      </div>
+
+      <form method="post">
+        {% csrf_token %}
+        <div class="panel" style="margin-bottom:20px;"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-pill"/></svg> Medicines found
+            <span class="pill muted">{{ items|length }}</span></h3>
+
+          {% if items %}
+          <p style="color:var(--muted);font-size:13.5px;margin:0 0 14px;">
+            The confidence shows how sure we are. Anything marked low is worth
+            checking carefully against the paper.
+          </p>
+
+          <table class="dtable">
+            <thead><tr><th style="width:52px;">Keep</th><th>Medicine</th><th>Dose</th><th>How often</th><th>Confidence</th></tr></thead>
+            <tbody>
+              {% for item in items %}
+              <tr>
+                <td><input type="checkbox" name="keep_{{ item.id }}" value="1"
+                           {% if item.confidence >= 0.5 %}checked{% endif %}
+                           style="width:20px;height:20px;"></td>
+                <td><input type="text" name="name_{{ item.id }}" value="{{ item.name }}" class="inp" style="min-width:170px;"></td>
+                <td><input type="text" name="dose_{{ item.id }}" value="{{ item.dose }}" class="inp" style="min-width:100px;" placeholder="e.g. 500 mg"></td>
+                <td><input type="text" name="frequency_{{ item.id }}" value="{{ item.frequency }}" class="inp" style="min-width:150px;" placeholder="e.g. Twice daily"></td>
+                <td>
+                  {% if item.confidence_band == 'high' %}<span class="pill ok">High</span>
+                  {% elif item.confidence_band == 'medium' %}<span class="pill warn">Medium</span>
+                  {% else %}<span class="pill danger">Low &mdash; check this</span>{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+
+          <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;">
+            <button type="submit" name="action" value="confirm" class="btn btn-teal">
+              <svg class="ic"><use href="#i-check"/></svg> Confirm and add to my medicines</button>
+            <button type="submit" name="action" value="discard" class="btn btn-danger-ghost">Discard all of this</button>
+          </div>
+
+          {% else %}
+          <div class="callout warn" style="margin:0 0 16px;">
+            <svg class="ic"><use href="#i-shield-alert"/></svg>
+            <div class="c-body">We couldn't identify any medicines in that image. This is common with handwritten prescriptions. You can add them by hand instead.</div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <a href="{% url 'health_medications' %}" class="btn btn-teal">Add medicines by hand</a>
+            <button type="submit" name="action" value="discard" class="btn btn-ghost">Close</button>
+          </div>
+          {% endif %}
+        </div></div>
+      </form>
+
+      <div class="grid g-2">
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-file-text"/></svg> The text we read</h3>
+          {% if job.raw_text %}
+          <div class="callout muted" style="margin:0;">
+            <svg class="ic"><use href="#i-file-text"/></svg>
+            <div class="c-body"><span style="white-space:pre-wrap;font-size:12.5px;">{{ job.raw_text|truncatechars:1200 }}</span></div>
+          </div>
+          <div class="hint">This is cleared as soon as you confirm or discard.</div>
+          {% else %}
+          <p style="color:var(--muted);font-size:13.5px;">Cleared &mdash; this upload has already been dealt with.</p>
+          {% endif %}
+        </div></div>
+
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-activity"/></svg> How this was read</h3>
+          <div class="kv"><span class="k">Text recognition</span><span class="v">Tesseract, on this computer</span></div>
+          <div class="kv"><span class="k">Recognition quality</span>
+            <span class="v">{% if job.ocr_confidence %}{{ job.ocr_confidence }}%{% else %}&mdash;{% endif %}</span></div>
+          <div class="kv"><span class="k">Understood by</span><span class="v">{{ job.get_parser_used_display }}</span></div>
+          <div class="kv"><span class="k">Photo deleted</span>
+            <span class="v">{{ job.file_deleted_at|date:"j M Y, g:i A" }}</span></div>
+          {% if job.parser_note %}
+          <div class="hint" style="margin-top:10px;">{{ job.parser_note }}</div>
+          {% endif %}
+        </div></div>
+      </div>
+
+{% endblock %}

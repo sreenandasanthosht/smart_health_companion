@@ -121,4 +121,26 @@ LOGIN_URL = 'login'  # used by @login_required when a page needs a real session
 LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'home'
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+# --- Document extraction (process-and-discard) ---
+# Django normally streams uploads larger than 2.5 MB to a temporary FILE on
+# disk. That would silently break the promise that an uploaded prescription
+# is never written to storage, so we force every upload to stay in memory and
+# cap the size instead. Anything larger is rejected rather than spilled.
+FILE_UPLOAD_HANDLERS = ['django.core.files.uploadhandler.MemoryFileUploadHandler']
+FILE_UPLOAD_MAX_MEMORY_SIZE = 15 * 1024 * 1024   # 15 MB
+MAX_UPLOAD_BYTES = 15 * 1024 * 1024
+
+# Path to the Tesseract binary. Windows installs usually need this set in .env,
+# e.g. TESSERACT_CMD=C:\\Program Files\\Tesseract-OCR\\tesseract.exe
+TESSERACT_CMD = os.getenv('TESSERACT_CMD', '')
+
+# --- LLM used to structure OCR text (Phase 2) ---
+# PRIVACY: when a key is configured, the OCR *text* of a prescription is sent
+# to this provider. The image itself never leaves the machine. With no key,
+# the system falls back to the local rule-based parser and nothing is sent.
+LLM_PROVIDER = os.getenv('LLM_PROVIDER', 'gemini')
+LLM_API_KEY = os.getenv('LLM_API_KEY', '')
+LLM_MODEL = os.getenv('LLM_MODEL', 'gemini-2.0-flash')
+LLM_TIMEOUT_SECONDS = int(os.getenv('LLM_TIMEOUT_SECONDS', '20'))
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField' 

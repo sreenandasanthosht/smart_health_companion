@@ -1,0 +1,28 @@
+sequenceDiagram
+    actor P as Provider
+    participant V as Django view
+    participant R as role_required
+    participant C as Consent service
+    participant A as Audit log
+    participant D as Database
+
+    P->>V: GET a patient's data
+    V->>R: is this user a PROVIDER?
+    alt wrong role
+        R-->>P: redirect to own dashboard
+    else correct role
+        R-->>V: allowed
+        V->>C: has_consent(patient, provider, VITALS)?
+        C->>D: un-revoked, un-expired grant?
+        D-->>C: yes / no
+        alt consent exists
+            C-->>V: granted
+            V->>D: read vitals
+            V->>A: log "viewed records"
+            V-->>P: render the data
+        else no consent
+            C-->>V: denied
+            V->>A: log the refused attempt
+            V-->>P: render "not shared" panel
+        end
+    end

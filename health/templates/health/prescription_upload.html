@@ -1,0 +1,108 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Upload Prescription &middot; CareNest{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar.html' with active='prescription' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Patient</span>
+        <h1>Upload a prescription</h1>
+        <div class="page-sub">Take a photo of your prescription and we'll read the medicines off it. You check what we found before anything is saved.</div>
+      </div>
+
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warn{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
+
+      <div class="grid g-7-5">
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-upload-cloud"/></svg> Choose a photo</h3>
+
+          <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="field">
+              <label>Prescription or lab report</label>
+              <input type="file" name="document" class="inp" accept="image/*" required>
+              <div class="hint">A JPG or PNG photo, up to 15 MB. Take it straight on, in good light.</div>
+            </div>
+
+            <div class="field">
+              <label>What is this?</label>
+              <select name="source_type" class="inp">
+                <option value="PRESCRIPTION">A prescription</option>
+                <option value="LAB_REPORT">A lab report</option>
+              </select>
+            </div>
+
+            <div class="callout muted" style="margin-bottom:16px;">
+              <svg class="ic"><use href="#i-shield-alert"/></svg>
+              <div class="c-body">
+                <strong>What happens to your photo.</strong>
+                We read the text from it on this computer, then the photo is
+                gone &mdash; it is never saved anywhere.
+                {% if llm_in_use %}
+                The <em>text</em> we read is sent to Google Gemini to work out the
+                medicine names and doses, and is not kept by them for training.
+                Your photo is never sent.
+                {% else %}
+                The text is processed on this computer too. Nothing is sent anywhere.
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="field">
+              <label style="display:flex;align-items:flex-start;gap:11px;font-weight:600;line-height:1.5;">
+                <input type="checkbox" name="consent" value="1" style="margin-top:3px;width:20px;height:20px;flex:0 0 20px;">
+                <span>Yes, read this photo{% if llm_in_use %} and send the text it contains to Gemini to be understood{% endif %}. I know the photo itself is deleted straight away and never stored.</span>
+              </label>
+            </div>
+
+            <button type="submit" class="btn btn-teal block">Read my prescription</button>
+            <div class="hint">You'll see everything we found and can correct it before it's saved.</div>
+          </form>
+        </div></div>
+
+        <div>
+          <div class="panel" style="margin-bottom:20px;"><div class="p-body tall">
+            <h3 class="p-h"><svg class="ic"><use href="#i-sparkles"/></svg> How this works</h3>
+            <div class="kv"><span class="k">1. You upload a photo</span><span class="v">Held in memory only</span></div>
+            <div class="kv"><span class="k">2. We read the text</span><span class="v">On this computer</span></div>
+            <div class="kv"><span class="k">3. The photo is discarded</span><span class="v">Before the page loads</span></div>
+            <div class="kv"><span class="k">4. You check what we found</span><span class="v">Nothing saved yet</span></div>
+            <div class="kv"><span class="k">5. You confirm</span><span class="v">Only then is it added</span></div>
+            <div class="callout muted" style="margin-top:14px;margin-bottom:0;">
+              <svg class="ic"><use href="#i-shield-alert"/></svg>
+              <div class="c-body">Reading a prescription is never perfect, especially handwriting. That's why you always check it before it's saved.</div>
+            </div>
+          </div></div>
+
+          {% if recent %}
+          <div class="panel"><div class="p-body tall">
+            <h3 class="p-h"><svg class="ic"><use href="#i-clock"/></svg> Recent uploads</h3>
+            <table class="dtable">
+              <thead><tr><th>When</th><th>File</th><th>Read by</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for j in recent %}
+                <tr>
+                  <td>{{ j.created_at|date:"j M, g:i A" }}</td>
+                  <td style="color:var(--muted);">{{ j.original_filename|truncatechars:22 }}</td>
+                  <td><span class="pill muted">{{ j.get_parser_used_display }}</span></td>
+                  <td>
+                    {% if j.status == 'CONFIRMED' %}<span class="pill ok">Confirmed</span>
+                    {% elif j.status == 'EXTRACTED' %}<a href="{% url 'health_extraction_verify' j.id %}" class="pill warn">Check it</a>
+                    {% elif j.status == 'FAILED' %}<span class="pill danger">Couldn't read</span>
+                    {% else %}<span class="pill muted">Discarded</span>{% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            <div class="hint">The photos from these uploads no longer exist. Only what you confirmed was kept.</div>
+          </div></div>
+          {% endif %}
+        </div>
+      </div>
+
+{% endblock %}
