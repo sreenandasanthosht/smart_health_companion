@@ -59,9 +59,83 @@
           {% endfor %}
           <div class="callout muted" style="margin-top:14px;margin-bottom:0;">
             <svg class="ic"><use href="#i-shield-alert"/></svg>
-            <div class="c-body">Approving grants access to vitals and medicines. You can withdraw it any time from Share Records.</div>
+            <div class="c-body">Approving shares your vitals, medicines, appointments, alerts, emergency contacts and
+              lifestyle logs. Records, documents, reports and the AI summary stay hidden until you share them
+              deliberately. You can withdraw any of it from Share Records.</div>
           </div>
         </div></div>
       </div>
+
+      {# ---------- New-device sign-ins ---------- #}
+      <div class="panel" style="margin-top:22px;"><div class="p-body tall">
+        <h3 class="p-h"><svg class="ic"><use href="#i-shield-alert"/></svg> New device sign-ins
+          {% if pending_devices %}<span class="pill warn">{{ pending_devices|length }}</span>{% endif %}</h3>
+        <p style="color:var(--muted);font-size:13.5px;margin:0 0 14px;">
+          When one of your caregivers signs in from a device we haven't seen before, we hold it here until you say it's them.</p>
+        {% for d in pending_devices %}
+        <div class="lrow" style="flex-direction:column;align-items:stretch;gap:10px;">
+          <div>
+            <div class="t">{{ d.user.display_name }} &middot; {{ d.label }}</div>
+            <div class="s">First seen {{ d.first_seen_at|date:"j M Y, g:i A" }}</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="device">
+              <input type="hidden" name="device_id" value="{{ d.id }}">
+              <input type="hidden" name="decision" value="approve">
+              <button type="submit" class="btn btn-green" style="padding:8px 14px;">
+                <svg class="ic"><use href="#i-check"/></svg> That's them</button>
+            </form>
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="device">
+              <input type="hidden" name="device_id" value="{{ d.id }}">
+              <input type="hidden" name="decision" value="reject">
+              <button type="submit" class="btn btn-danger-ghost" style="padding:8px 14px;">Block this device</button>
+            </form>
+          </div>
+        </div>
+        {% empty %}
+        <p style="color:var(--muted);font-size:13.5px;">No devices waiting on you.</p>
+        {% endfor %}
+      </div></div>
+
+      {# ---------- Invite codes ---------- #}
+      <div class="panel" style="margin-top:22px;"><div class="p-body tall">
+        <h3 class="p-h"><svg class="ic"><use href="#i-share"/></svg> Invite codes</h3>
+        <p style="color:var(--muted);font-size:13.5px;margin:0 0 14px;">
+          Instead of giving out your CareNest ID, generate a single-use code. It works once, expires after seven
+          days, and you can cancel it at any time.</p>
+
+        <form method="post" style="display:flex;gap:8px;align-items:flex-end;margin-bottom:16px;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="invite">
+          <div class="field" style="flex:1;margin-bottom:0;"><label>Who is this for?</label>
+            <input type="text" name="label" class="inp" placeholder="e.g. My daughter Anita"></div>
+          <button type="submit" class="btn btn-teal" style="padding:10px 16px;">Generate code</button>
+        </form>
+
+        {% for i in invites %}
+        <div class="lrow">
+          <div class="grow">
+            <div class="t"><code>{{ i.code }}</code>
+              <span class="pill {% if i.status_label == 'Active' %}ok{% else %}muted{% endif %}">{{ i.status_label }}</span></div>
+            <div class="s">{{ i.label|default:"No label" }} &middot; created {{ i.created_at|date:"j M Y" }}
+              {% if i.used_by %}&middot; used by {{ i.used_by.display_name }}{% endif %}</div>
+          </div>
+          {% if i.status_label == 'Active' %}
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="revoke_invite">
+            <input type="hidden" name="invite_id" value="{{ i.id }}">
+            <button type="submit" class="btn btn-danger-ghost">Cancel</button>
+          </form>
+          {% endif %}
+        </div>
+        {% empty %}
+        <p style="color:var(--muted);font-size:13.5px;">No codes generated yet.</p>
+        {% endfor %}
+      </div></div>
 
 {% endblock %}

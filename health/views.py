@@ -9,16 +9,21 @@ import datetime
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from accounts.decorators import role_required
-from accounts.models import CaregiverLink, User
+from accounts.devices import current_device, device_is_trusted
+from accounts.linking import create_link_request, resolve_patient
+from accounts.models import (
+    CaregiverInvite, CaregiverLink, Notification, TrustedDevice, User,
+)
 from adminpanel.models import AuditLog
 from health import analytics
 from health.models import (
-    ConsentGrant, LifestyleLog, Medication, MedicationDose, MoodLog,
-    VitalRecord, has_consent,
+    ConsentGrant, HealthDocument, LifestyleLog, Medication, MedicationDose,
+    MoodLog, SCOPE_FIELDS, VitalRecord, consent_matrix, has_consent,
 )
 from providers.models import Appointment, ProviderProfile
 
@@ -352,6 +357,13 @@ def share_records(request):
             AuditLog.record(request.user, 'Revoked a record share',
                             f"{grant.recipient.display_name} -- {grant.scope_label()}",
                             AuditLog.Tag.WARN)
+            Notification.send(
+                grant.recipient,
+                title=f'{request.user.display_name} withdrew access',
+                body=f'You can no longer see: {grant.scope_label()}.',
+                kind=Notification.Kind.CONSENT,
+                level=Notification.Level.WARNING,
+            )
             messages.info(request, f'Access revoked for {grant.recipient.display_name}.')
             return redirect('health_share')
 
@@ -374,17 +386,24 @@ def share_records(request):
             except ValueError:
                 expires_at = timezone.now() + datetime.timedelta(hours=2)
 
+        # Derive the boolean columns from SCOPE_FIELDS so a new category
+        # only ever has to be added in one place.
+        scope_flags = {field: (scope in scopes) for scope, field in SCOPE_FIELDS.items()}
+
         grant = ConsentGrant.objects.create(
             patient=request.user, recipient=recipient,
-            scope_vitals='VITALS' in scopes,
-            scope_medications='MEDICATIONS' in scopes,
-            scope_records='RECORDS' in scopes,
-            scope_lifestyle='LIFESTYLE' in scopes,
             expires_at=expires_at,
             action_context=request.POST.get('context', 'Manual share'),
+            **scope_flags,
         )
         AuditLog.record(request.user, 'Granted a record share',
                         f"{recipient.display_name} -- {grant.scope_label()}", AuditLog.Tag.OK)
+        Notification.send(
+            recipient,
+            title=f'{request.user.display_name} shared records with you',
+            body=grant.scope_label(),
+            kind=Notification.Kind.CONSENT,
+        )
         messages.success(request, f'Share created. Passcode: {grant.passcode}')
         return redirect('health_share')
 
@@ -406,6 +425,16 @@ def share_records(request):
         'active_shares': active,
         'history': history,
         'recipients': list(provider_users) + list(caregiver_users),
+        # Rendered as two checkbox groups so the restricted categories are
+        # visibly separate from the everyday ones.
+        'standard_scopes': [
+            (scope.value, scope.label, scope in (ConsentGrant.Scope.VITALS,
+                                                 ConsentGrant.Scope.MEDICATIONS))
+            for scope in ConsentGrant.STANDARD_SCOPES
+        ],
+        'restricted_scopes': [
+            (scope.value, scope.label) for scope in ConsentGrant.RESTRICTED_SCOPES
+        ],
     }
     return render(request, 'health/share_records.html', context)
 
@@ -416,6 +445,16 @@ def share_records(request):
 
 @role_required(User.Role.CAREGIVER)
 def caregiver_dashboard(request):
+    """
+    The caregiver's single screen, built from the modules the Caregiver
+    Module proposal lists: linked patient overview, medication status,
+    health status, upcoming appointments, notifications, emergency
+    contacts and a "needs attention" card.
+
+    Every module is gated on its own consent scope. A module the patient
+    hasn't granted isn't shown greyed out or empty -- it is absent, per
+    "Unapproved modules are hidden from the caregiver."
+    """
     link = (
         CaregiverLink.objects.filter(caregiver=request.user, status=CaregiverLink.Status.APPROVED)
         .select_related('patient').first()
@@ -423,87 +462,297 @@ def caregiver_dashboard(request):
     pending = CaregiverLink.objects.filter(
         caregiver=request.user, status=CaregiverLink.Status.PENDING).select_related('patient').first()
 
+    notifications = Notification.objects.filter(user=request.user)[:6]
+
     if not link:
         # No approved link yet -- show the waiting/link state instead of data.
         return render(request, 'health/caregiver_dashboard.html', {
-            'link': None, 'pending': pending,
+            'link': None, 'pending': pending, 'notifications': notifications,
+        })
+
+    # Second gate, after the link itself: is this browser one the patient
+    # has approved? An unrecognised device sees the same nothing an
+    # unapproved caregiver does.
+    if not device_is_trusted(request):
+        return render(request, 'health/caregiver_dashboard.html', {
+            'link': link, 'pending': None, 'notifications': notifications,
+            'device_blocked': True, 'device': current_device(request),
+            'patient': link.patient,
         })
 
     patient = link.patient
+    today = timezone.localdate()
 
-    # Consent gate: a caregiver sees vitals only if the patient granted it.
-    can_see_vitals = has_consent(patient, request.user, ConsentGrant.Scope.VITALS)
-    can_see_medications = has_consent(patient, request.user, ConsentGrant.Scope.MEDICATIONS)
+    # One query resolves every category rather than one query per module.
+    consent = consent_matrix(patient, request.user)
+    Scope = ConsentGrant.Scope
 
-    recent_vitals = VitalRecord.objects.filter(patient=patient)[:5] if can_see_vitals else []
-    meds = Medication.objects.filter(patient=patient, active=True) if can_see_medications else []
+    can_vitals = consent[Scope.VITALS]
+    can_medications = consent[Scope.MEDICATIONS]
+    can_appointments = consent[Scope.APPOINTMENTS]
+    can_alerts = consent[Scope.ALERTS]
+    can_emergency = consent[Scope.EMERGENCY]
+    can_lifestyle = consent[Scope.LIFESTYLE]
 
-    alerts = []
-    if can_see_vitals:
-        alerts = list(patient.insights.filter(
-            level__in=['WARNING', 'CRITICAL'])[:4])
+    recent_vitals = list(VitalRecord.objects.filter(patient=patient)[:5]) if can_vitals else []
+    meds = Medication.objects.filter(patient=patient, active=True) if can_medications else []
+    alerts = list(patient.insights.filter(level__in=['WARNING', 'CRITICAL'])[:4]) if can_alerts else []
+
+    appointments = []
+    if can_appointments:
+        appointments = list(
+            Appointment.objects.filter(
+                patient=patient, scheduled_for__gte=timezone.now(),
+                status__in=[Appointment.Status.REQUESTED, Appointment.Status.CONFIRMED],
+            ).select_related('provider', 'provider__user')[:4]
+        )
 
     missed = 0
-    if can_see_medications:
+    doses_due_today = 0
+    if can_medications:
         missed = MedicationDose.objects.filter(
             medication__patient=patient, taken=False,
-            date__gte=timezone.localdate() - datetime.timedelta(days=7),
+            date__gte=today - datetime.timedelta(days=7), date__lt=today,
         ).count()
+        doses_due_today = MedicationDose.objects.filter(
+            medication__patient=patient, date=today, taken=False).count()
+
+    lifestyle_today = LifestyleLog.objects.filter(patient=patient, date=today).first() if can_lifestyle else None
+
+    # --- Needs Attention -------------------------------------------------
+    # Deliberately assembled from what the caregiver is already allowed to
+    # see, so the card can never leak the existence of a hidden category.
+    needs_attention = []
+    latest_vital = recent_vitals[0] if recent_vitals else None
+    if can_vitals and latest_vital and latest_vital.status == VitalRecord.Status.HIGH:
+        needs_attention.append({
+            'title': 'Latest reading is high',
+            'detail': f'{latest_vital.bp_systolic}/{latest_vital.bp_diastolic} on '
+                      f'{latest_vital.recorded_at:%-d %b at %-I:%M %p}',
+            'level': 'danger',
+        })
+    if can_medications and missed:
+        needs_attention.append({
+            'title': f"{missed} missed dose{'s' if missed != 1 else ''} this week",
+            'detail': 'Adherence has slipped in the last seven days.',
+            'level': 'warn',
+        })
+    if can_medications and doses_due_today:
+        needs_attention.append({
+            'title': f"{doses_due_today} dose{'s' if doses_due_today != 1 else ''} still due today",
+            'detail': 'Nothing ticked off yet for these.',
+            'level': 'warn',
+        })
+    if can_vitals and not recent_vitals:
+        needs_attention.append({
+            'title': 'No vitals logged yet',
+            'detail': 'There are no readings to monitor.',
+            'level': 'warn',
+        })
+    for insight in alerts:
+        needs_attention.append({
+            'title': insight.text,
+            'detail': insight.evidence,
+            'level': 'danger' if insight.level == 'CRITICAL' else 'warn',
+        })
 
     context = {
         'link': link,
         'pending': None,
         'patient': patient,
-        'can_see_vitals': can_see_vitals,
-        'can_see_medications': can_see_medications,
+        'notifications': notifications,
+        'unread_count': sum(1 for n in notifications if n.is_unread),
+        # Per-module gates.
+        'can_see_vitals': can_vitals,
+        'can_see_medications': can_medications,
+        'can_see_appointments': can_appointments,
+        'can_see_alerts': can_alerts,
+        'can_see_emergency': can_emergency,
+        'can_see_lifestyle': can_lifestyle,
+        # Module data.
         'recent_vitals': recent_vitals,
-        'latest_vital': recent_vitals[0] if recent_vitals else None,
+        'latest_vital': latest_vital,
         'medications': meds,
         'alerts': alerts,
+        'appointments': appointments,
         'missed_doses': missed,
-        'adherence': analytics.medication_adherence(patient) if can_see_medications else None,
+        'doses_due_today': doses_due_today,
+        'lifestyle_today': lifestyle_today,
+        'needs_attention': needs_attention,
+        'adherence': analytics.medication_adherence(patient) if can_medications else None,
+        # What the patient has chosen NOT to share -- shown as a short,
+        # honest list so the caregiver understands the gaps.
+        'withheld': [
+            ConsentGrant.Scope(scope).label
+            for scope in ConsentGrant.STANDARD_SCOPES if not consent[scope]
+        ],
     }
     return render(request, 'health/caregiver_dashboard.html', context)
 
 
 @role_required(User.Role.CAREGIVER)
 def caregiver_link_request(request):
-    """A caregiver who registered without a valid patient ID can retry here."""
+    """
+    A caregiver who registered without a usable reference can retry here.
+
+    Accepts the same three identifiers as the sign-up form: patient ID,
+    patient email, or a single-use invite code.
+    """
     if request.method == 'POST':
-        code = request.POST.get('patient_id', '').strip().upper()
-        patient = User.objects.filter(unique_id=code, role=User.Role.PATIENT).first()
+        patient, invite, error = resolve_patient(request.POST.get('patient_ref', ''))
         if not patient:
-            messages.error(request, 'No patient found with that ID. Ask them to check their dashboard.')
+            messages.error(request, error)
         elif CaregiverLink.objects.filter(patient=patient, caregiver=request.user).exists():
             messages.info(request, 'You have already requested access to this patient.')
         else:
-            CaregiverLink.objects.create(
-                patient=patient, caregiver=request.user,
+            create_link_request(
+                patient, request.user,
                 relationship=request.POST.get('relationship', '').strip(),
+                invite=invite,
             )
             messages.success(request, f'Request sent to {patient.display_name}. They need to approve it.')
         return redirect('health_caregiver_dashboard')
     return redirect('health_caregiver_dashboard')
 
 
+@login_required
+def notifications_view(request):
+    """Everyone's notification list. Opening the page marks them read."""
+    items = list(Notification.objects.filter(user=request.user)[:50])
+    Notification.objects.filter(user=request.user, read_at__isnull=True).update(read_at=timezone.now())
+    return render(request, 'health/notifications.html', {'items': items})
+
+
+@login_required
+def report_problem(request):
+    """
+    Where any user files a report for an Admin to review.
+
+    Naming someone is optional: a lot of reports are about the platform,
+    and requiring a target would push people into blaming whoever is
+    nearest. Admins are excluded from the "who is this about" list --
+    complaints about an Admin should go through a channel that isn't
+    reviewed by their own colleagues, which this deliberately isn't.
+    """
+    from adminpanel.models import Complaint
+
+    if request.method == 'POST':
+        subject = request.POST.get('subject', '').strip()
+        description = request.POST.get('description', '').strip()
+        if not (subject and description):
+            messages.error(request, 'Please give your report a subject and describe what happened.')
+            return redirect('report_problem')
+
+        against = User.objects.filter(pk=request.POST.get('against_user') or 0).exclude(
+            role=User.Role.ADMIN).first()
+        complaint = Complaint.objects.create(
+            reporter=request.user, against_user=against,
+            category=request.POST.get('category', Complaint.Category.OTHER),
+            subject=subject, description=description,
+        )
+        AuditLog.record(request.user, 'Filed a report', complaint.subject, AuditLog.Tag.WARN)
+        messages.success(request, 'Report submitted. An administrator will review it.')
+        return redirect('report_problem')
+
+    # Only people this user actually deals with, so the dropdown isn't a
+    # directory of every account on the platform.
+    known = User.objects.filter(
+        Q(patient_links__patient=request.user)
+        | Q(caregiver_links__caregiver=request.user)
+        | Q(provider_profile__appointments__patient=request.user)
+    ).exclude(pk=request.user.pk).exclude(role=User.Role.ADMIN).distinct()
+
+    return render(request, 'health/report_problem.html', {
+        'categories': Complaint.Category.choices,
+        'known_people': known,
+        'my_reports': Complaint.objects.filter(reporter=request.user)[:10],
+    })
+
+
 @role_required(User.Role.PATIENT)
 def caregiver_requests(request):
-    """The patient approves or rejects caregiver link requests here."""
+    """
+    The patient's control panel for caregiver access: pending link
+    requests, new-device sign-ins waiting on them, and the invite codes
+    they can hand out.
+    """
     if request.method == 'POST':
+        action = request.POST.get('action', 'link')
+
+        # --- New-device approval -----------------------------------------
+        if action == 'device':
+            device = get_object_or_404(
+                TrustedDevice, pk=request.POST.get('device_id'), patient=request.user)
+            if request.POST.get('decision') == 'approve':
+                device.approve()
+                AuditLog.record(request.user, 'Approved a caregiver device',
+                                f'{device.user.display_name} -- {device.label}', AuditLog.Tag.OK)
+                Notification.send(
+                    device.user,
+                    title='Your new device was approved',
+                    body=f'{request.user.display_name} approved {device.label}.',
+                    kind=Notification.Kind.DEVICE_APPROVAL,
+                    action_url_name='health_caregiver_dashboard',
+                )
+                messages.success(request, f'{device.label} approved.')
+            else:
+                device.reject()
+                AuditLog.record(request.user, 'Rejected a caregiver device',
+                                f'{device.user.display_name} -- {device.label}', AuditLog.Tag.WARN)
+                messages.info(request, f'{device.label} blocked.')
+            return redirect('health_caregiver_requests')
+
+        # --- Invite codes -------------------------------------------------
+        if action == 'invite':
+            invite = CaregiverInvite.objects.create(
+                patient=request.user,
+                label=request.POST.get('label', '').strip(),
+                expires_at=timezone.now() + datetime.timedelta(days=7),
+            )
+            AuditLog.record(request.user, 'Generated a caregiver invite code',
+                            invite.label or invite.code, AuditLog.Tag.MUTED)
+            messages.success(request, f'Invite code {invite.code} created. It expires in 7 days.')
+            return redirect('health_caregiver_requests')
+
+        if action == 'revoke_invite':
+            invite = get_object_or_404(CaregiverInvite, pk=request.POST.get('invite_id'), patient=request.user)
+            invite.expires_at = timezone.now()
+            invite.save(update_fields=['expires_at'])
+            messages.info(request, f'Invite code {invite.code} cancelled.')
+            return redirect('health_caregiver_requests')
+
+        # --- Caregiver link decision --------------------------------------
         link = get_object_or_404(CaregiverLink, pk=request.POST.get('link_id'), patient=request.user)
         decision = request.POST.get('decision')
         if decision == 'approve':
             link.status = CaregiverLink.Status.APPROVED
             link.decided_at = timezone.now()
             link.save(update_fields=['status', 'decided_at'])
-            # Approving the link also grants the baseline consent to see vitals.
+            # Approving the link grants the everyday categories only.
+            # Records, documents, reports and the AI summary are
+            # restricted: the patient has to hand those over deliberately
+            # from Share Records.
             ConsentGrant.objects.get_or_create(
                 patient=request.user, recipient=link.caregiver, revoked_at__isnull=True,
-                defaults={'scope_vitals': True, 'scope_medications': True,
-                          'action_context': 'Caregiver monitoring'},
+                defaults={
+                    'scope_vitals': True,
+                    'scope_medications': True,
+                    'scope_appointments': True,
+                    'scope_alerts': True,
+                    'scope_emergency': True,
+                    'scope_lifestyle': True,
+                    'action_context': 'Caregiver monitoring',
+                },
             )
             AuditLog.record(request.user, 'Approved a caregiver link',
                             link.caregiver.display_name, AuditLog.Tag.OK)
+            Notification.send(
+                link.caregiver,
+                title=f'{request.user.display_name} approved your request',
+                body='You can now see their vitals, medicines, appointments and alerts.',
+                kind=Notification.Kind.CAREGIVER_DECISION,
+                action_url_name='health_caregiver_dashboard',
+            )
             messages.success(request, f'{link.caregiver.display_name} can now monitor your vitals.')
         else:
             link.status = CaregiverLink.Status.REJECTED
@@ -511,6 +760,12 @@ def caregiver_requests(request):
             link.save(update_fields=['status', 'decided_at'])
             AuditLog.record(request.user, 'Rejected a caregiver link',
                             link.caregiver.display_name, AuditLog.Tag.MUTED)
+            Notification.send(
+                link.caregiver,
+                title=f'{request.user.display_name} declined your request',
+                body='They have not shared any data with you.',
+                kind=Notification.Kind.CAREGIVER_DECISION,
+            )
             messages.info(request, 'Request declined.')
         return redirect('health_caregiver_requests')
 
@@ -518,4 +773,7 @@ def caregiver_requests(request):
     return render(request, 'health/caregiver_requests.html', {
         'pending': [l for l in links if l.status == CaregiverLink.Status.PENDING],
         'decided': [l for l in links if l.status != CaregiverLink.Status.PENDING],
+        'pending_devices': TrustedDevice.objects.filter(
+            patient=request.user, status=TrustedDevice.Status.PENDING).select_related('user'),
+        'invites': CaregiverInvite.objects.filter(patient=request.user)[:8],
     })

@@ -29,6 +29,29 @@ ROLE_HOME = {
 }
 
 
+def super_admin_required(view_func):
+    """
+    Stricter than `role_required(ADMIN)`: only the Super Admin tier.
+
+    Guards the two things the Admin Module proposal reserves to the Super
+    Admin -- creating Admin accounts, and system settings. A plain Admin
+    hitting one of these is bounced to their dashboard with an
+    explanation, not a 403, since they are legitimately signed in.
+    """
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect('login')
+        if request.user.is_suspended:
+            messages.error(request, 'Your account has been suspended. Please contact support.')
+            return redirect('logout')
+        if not request.user.is_platform_super_admin:
+            messages.error(request, 'That page is restricted to the Super Admin.')
+            return redirect(ROLE_HOME.get(request.user.role, 'home'))
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
 def role_required(*roles):
     allowed = {str(r) for r in roles}
 

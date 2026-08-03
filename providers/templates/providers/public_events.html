@@ -1,0 +1,53 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Health Camps &amp; Events &middot; CareNest{% endblock %}
+{% block sidebar %}
+  {% if user.role == 'CAREGIVER' %}{% include 'partials/_sidebar_caregiver.html' with active='events' %}
+  {% elif user.role == 'PROVIDER' %}{% include 'partials/_sidebar_provider.html' with active='events' %}
+  {% elif user.role == 'NURSE' %}{% include 'partials/_sidebar_nurse.html' with active='events' %}
+  {% elif user.role == 'ADMIN' %}{% include 'partials/_sidebar_admin.html' with active='events' %}
+  {% else %}{% include 'partials/_sidebar.html' with active='events' %}{% endif %}
+{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <h1>Health Camps &amp; Events</h1>
+        <div class="page-sub">Free and paid programmes run by verified providers. Everything here has been
+          approved by a CareNest administrator.</div>
+      </div>
+
+      <div class="panel" style="margin-bottom:18px;"><div class="p-body">
+        <form method="get" style="display:flex;gap:10px;align-items:flex-end;">
+          <div class="field" style="margin-bottom:0;min-width:220px;"><label>Type</label>
+            <select name="kind" class="inp">
+              <option value="">All types</option>
+              {% for value, label in kinds %}
+              <option value="{{ value }}" {% if selected_kind == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select></div>
+          <button type="submit" class="btn btn-teal" style="padding:10px 16px;">Filter</button>
+        </form>
+      </div></div>
+
+      <div class="grid" style="grid-template-columns:repeat(2,1fr);gap:18px;">
+        {% for e in events %}
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-calendar-days"/></svg> {{ e.title }}
+            {% if e.is_free %}<span class="pill ok">Free</span>{% endif %}</h3>
+          <div class="kv"><span class="k">When</span><span class="v">{{ e.starts_at|date:"j M Y, g:i A" }}</span></div>
+          <div class="kv"><span class="k">Type</span><span class="v">{{ e.get_kind_display }}</span></div>
+          <div class="kv"><span class="k">Run by</span><span class="v">{{ e.provider.display_name }}</span></div>
+          {% if e.venue %}<div class="kv"><span class="k">Where</span><span class="v">{{ e.venue }}</span></div>{% endif %}
+          {% if e.capacity %}<div class="kv"><span class="k">Capacity</span><span class="v">{{ e.capacity }}</span></div>{% endif %}
+          {% if e.description %}
+          <p style="font-size:13.5px;margin:12px 0 0;white-space:pre-wrap;">{{ e.description }}</p>
+          {% endif %}
+        </div></div>
+        {% empty %}
+        <div class="panel"><div class="p-body tall">
+          <p style="color:var(--muted);font-size:13.5px;">No upcoming events{% if selected_kind %} of that type{% endif %}.</p>
+        </div></div>
+        {% endfor %}
+      </div>
+
+{% endblock %}

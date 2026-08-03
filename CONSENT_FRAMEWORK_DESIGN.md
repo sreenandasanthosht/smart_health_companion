@@ -30,11 +30,26 @@ A consent check must fire at every point where data leaves the patient's own vie
 
 Consent is not all-or-nothing. Three axes:
 
-- **By category.** Vitals, Medications, Lab/prescription records, Lifestyle logs can each
-  be granted independently. **Mental health entries are the one exception: they are never
-  shareable at all**, per the existing design ("Private Mental Health Log... never visible
-  to caregivers or providers" -- `core/views.py`). This isn't a consent option the patient
-  turns on/off; it's a hard exclusion enforced regardless of what else is granted.
+- **By category.** Each category is granted independently. Following the Caregiver Module
+  proposal, the categories fall into two tiers:
+
+  | Tier | Categories | Default on approval |
+  |---|---|---|
+  | Standard | Vital signs, Medication status, Appointments, Health alerts, Emergency contacts, Lifestyle tracking | granted |
+  | Restricted | Lab/prescription records, Health documents, Medical reports, AI health summary | withheld |
+
+  The tiers are declared once, as `ConsentGrant.STANDARD_SCOPES` and
+  `ConsentGrant.RESTRICTED_SCOPES` in `health/models.py`, and the share form, the caregiver
+  dashboard and the link-approval defaults all read from them. Approving a caregiver link
+  grants the standard tier only; the restricted tier always requires a deliberate,
+  separate act by the patient on the Share Records page.
+
+  **Mental health entries are the one exception: they are never shareable at all**, per the
+  existing design ("Private Mental Health Log... never visible to caregivers or providers"
+  -- `core/views.py`). This isn't a consent option the patient turns on/off; it's a hard
+  exclusion enforced regardless of what else is granted. There is deliberately no
+  `MENTAL_HEALTH` member of `ConsentGrant.Scope`, so `has_consent()` has no value it could
+  return True for -- `accounts/tests.py` asserts this.
 - **By time.** A grant can be open-ended (e.g. an ongoing Caregiver link) or time-boxed
   (e.g. "for the next 2 hours" for a one-off provider share).
 - **By recipient.** A grant is always scoped to one specific person or role instance (a

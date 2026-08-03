@@ -1,0 +1,66 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Report a Problem &middot; CareNest{% endblock %}
+{% block sidebar %}
+  {% if user.role == 'CAREGIVER' %}{% include 'partials/_sidebar_caregiver.html' with active='report' %}
+  {% elif user.role == 'PROVIDER' %}{% include 'partials/_sidebar_provider.html' with active='report' %}
+  {% elif user.role == 'NURSE' %}{% include 'partials/_sidebar_nurse.html' with active='report' %}
+  {% else %}{% include 'partials/_sidebar.html' with active='report' %}{% endif %}
+{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <h1>Report a Problem</h1>
+        <div class="page-sub">Reports go to CareNest administrators. You'll be told the outcome.</div>
+      </div>
+
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
+
+      <div class="grid g-7-5">
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-message"/></svg> What happened?</h3>
+          <form method="post">
+            {% csrf_token %}
+            <div class="field"><label>Category</label>
+              <select name="category" class="inp">
+                {% for value, label in categories %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+              </select></div>
+            <div class="field"><label>Is this about someone? (optional)</label>
+              <select name="against_user" class="inp">
+                <option value="">Not about a specific person</option>
+                {% for p in known_people %}
+                <option value="{{ p.id }}">{{ p.display_name }} &mdash; {{ p.get_role_display }}</option>
+                {% endfor %}
+              </select></div>
+            <div class="field"><label>Subject</label>
+              <input type="text" name="subject" class="inp" placeholder="One line summary" required></div>
+            <div class="field"><label>Details</label>
+              <textarea name="description" class="inp" rows="6" placeholder="What happened, and when" required></textarea></div>
+            <button type="submit" class="btn btn-teal block">Submit report</button>
+          </form>
+        </div></div>
+
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-clock"/></svg> Your reports</h3>
+          {% for c in my_reports %}
+          <div class="lrow">
+            <div class="grow">
+              <div class="t">{{ c.subject }}
+                <span class="pill {% if c.status == 'RESOLVED' %}ok{% elif c.status == 'DISMISSED' %}muted{% else %}warn{% endif %}">{{ c.get_status_display }}</span></div>
+              <div class="s">{{ c.get_category_display }} &middot; {{ c.created_at|date:"j M Y" }}</div>
+              {% if c.resolution_note %}<div class="s">{{ c.resolution_note }}</div>{% endif %}
+            </div>
+          </div>
+          {% empty %}
+          <p style="color:var(--muted);font-size:13.5px;">You haven't filed any reports.</p>
+          {% endfor %}
+        </div></div>
+      </div>
+
+{% endblock %}

@@ -1,0 +1,88 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Platform Analytics &middot; CareNest{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar_admin.html' with active='analytics' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Admin</span>
+        <h1>Platform Analytics</h1>
+        <div class="page-sub">Aggregate counts only &mdash; no individual's records are read to build this page.</div>
+      </div>
+
+      <h3 class="p-h" style="margin-bottom:12px;"><svg class="ic"><use href="#i-activity"/></svg> Growth</h3>
+      <div class="grid stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:26px;">
+        {% for m in growth %}
+        <div class="card stat">
+          <div class="label">{{ m.label }}</div>
+          <div class="big" style="margin:2px 0 6px;">{{ m.value }}</div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <h3 class="p-h" style="margin-bottom:12px;"><svg class="ic"><use href="#i-heart-pulse"/></svg> Activity (last 30 days)</h3>
+      <div class="grid stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:26px;">
+        {% for m in activity %}
+        <div class="card stat">
+          <div class="label">{{ m.label }}</div>
+          <div class="big" style="margin:2px 0 6px;">{{ m.value }}</div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <h3 class="p-h" style="margin-bottom:12px;"><svg class="ic"><use href="#i-shield-alert"/></svg> Trust &amp; consent</h3>
+      <div class="grid stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:26px;">
+        {% for m in trust %}
+        <div class="card stat">
+          <div class="label">{{ m.label }}</div>
+          <div class="big" style="margin:2px 0 6px;">{{ m.value }}</div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="grid g-7-5">
+        <div>
+          <div class="panel" style="margin-bottom:20px;"><div class="p-body tall">
+            <h3 class="p-h"><svg class="ic"><use href="#i-users"/></svg> Users by role</h3>
+            {% for r in role_rows %}
+            <div class="goal">
+              <div class="g-top"><span class="g-name">{{ r.label }}</span><span class="g-val">{{ r.count }}</span></div>
+              <div class="bar"><span style="width:{{ r.pct }}%;background:#0d9488;"></span></div>
+            </div>
+            {% endfor %}
+          </div></div>
+
+          <div class="panel"><div class="p-body tall">
+            <h3 class="p-h"><svg class="ic"><use href="#i-calendar-check"/></svg> Appointments by status</h3>
+            <table class="dtable">
+              <thead><tr><th>Status</th><th>Count</th></tr></thead>
+              <tbody>
+                {% for r in appointment_rows %}
+                <tr><td>{{ r.label }}</td><td>{{ r.count }}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div></div>
+        </div>
+
+        <div>
+          <div class="panel" style="margin-bottom:20px;"><div class="p-body tall">
+            <h3 class="p-h"><svg class="ic"><use href="#i-stethoscope"/></svg> Provider verification</h3>
+            {% for r in verification_rows %}
+            <div class="goal">
+              <div class="g-top"><span class="g-name">{{ r.label }}</span><span class="g-val">{{ r.count }}</span></div>
+              <div class="bar"><span style="width:{{ r.pct }}%;background:#f59e0b;"></span></div>
+            </div>
+            {% endfor %}
+          </div></div>
+
+          <div class="panel"><div class="p-body tall">
+            <h3 class="p-h"><svg class="ic"><use href="#i-calendar-days"/></svg> Events</h3>
+            <div class="kv"><span class="k">Approved</span><span class="v">{{ events_approved }}</span></div>
+            <div class="kv"><span class="k">Pending</span><span class="v">{{ events_pending }}</span></div>
+            <div class="kv"><span class="k">Rejected</span><span class="v">{{ events_rejected }}</span></div>
+          </div></div>
+        </div>
+      </div>
+
+{% endblock %}

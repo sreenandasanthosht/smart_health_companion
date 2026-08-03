@@ -5,7 +5,7 @@
 {% block dashboard_content %}
 
       <div class="page-head">
-        <span class="chip-role">Admin</span>
+        <span class="chip-role">{{ admin_tier|default:"Admin" }}</span>
         <h1>Platform overview</h1>
         <div class="page-sub">Live numbers from the database &mdash; users, verifications and activity across CareNest.</div>
       </div>
@@ -16,13 +16,18 @@
       </div>
       {% endfor %}
 
-      <div class="grid stats">
+      {# The five cards the Admin Module proposal names. #}
+      <div class="grid stats" style="grid-template-columns:repeat(5,1fr);">
+        {% for c in cards %}
         <div class="card stat">
-          <div class="top"><span class="chip blue"><svg class="ic"><use href="#i-users"/></svg></span></div>
-          <div class="label">Total users</div>
-          <div class="big">{{ total_users }}</div>
-          <a class="link" href="{% url 'admin_users' %}">Manage users <svg class="ic"><use href="#i-arrow-right"/></svg></a>
+          <div class="label">{{ c.label }}</div>
+          <div class="big">{{ c.value }}</div>
+          <a class="link" href="{% url c.url_name %}">Open <svg class="ic"><use href="#i-arrow-right"/></svg></a>
         </div>
+        {% endfor %}
+      </div>
+
+      <div class="grid stats" style="margin-top:18px;">
         <div class="card stat">
           <div class="top"><span class="chip green"><svg class="ic"><use href="#i-stethoscope"/></svg></span></div>
           <div class="label">Verified providers</div>
@@ -30,16 +35,22 @@
           <a class="link" href="{% url 'admin_providers' %}">View providers <svg class="ic"><use href="#i-arrow-right"/></svg></a>
         </div>
         <div class="card stat">
-          <div class="top"><span class="chip orange"><svg class="ic"><use href="#i-shield-alert"/></svg></span></div>
-          <div class="label">Pending verifications</div>
-          <div class="big">{{ pending_verifications }}</div>
-          <a class="link" href="{% url 'admin_verification' %}">Review queue <svg class="ic"><use href="#i-arrow-right"/></svg></a>
-        </div>
-        <div class="card stat">
           <div class="top"><span class="chip purple"><svg class="ic"><use href="#i-sparkles"/></svg></span></div>
           <div class="label">New sign-ups today</div>
           <div class="big">{{ new_signups_today }}</div>
           <div class="meta">{{ new_signups_breakdown }}</div>
+        </div>
+        <div class="card stat">
+          <div class="top"><span class="chip blue"><svg class="ic"><use href="#i-activity"/></svg></span></div>
+          <div class="label">Platform analytics</div>
+          <div class="big">&mdash;</div>
+          <a class="link" href="{% url 'admin_analytics' %}">See the breakdown <svg class="ic"><use href="#i-arrow-right"/></svg></a>
+        </div>
+        <div class="card stat">
+          <div class="top"><span class="chip orange"><svg class="ic"><use href="#i-bell"/></svg></span></div>
+          <div class="label">Announcements</div>
+          <div class="big">&mdash;</div>
+          <a class="link" href="{% url 'admin_announcements' %}">Publish a notice <svg class="ic"><use href="#i-arrow-right"/></svg></a>
         </div>
       </div>
 

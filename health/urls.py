@@ -13,4 +13,6 @@ urlpatterns = [
     path('caregiver-dashboard/', views.caregiver_dashboard, name='health_caregiver_dashboard'),
     path('caregiver-link/', views.caregiver_link_request, name='health_caregiver_link'),
     path('caregiver-requests/', views.caregiver_requests, name='health_caregiver_requests'),
+    path('notifications/', views.notifications_view, name='notifications'),
+    path('report/', views.report_problem, name='report_problem'),
 ]

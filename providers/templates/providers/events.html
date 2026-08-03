@@ -1,0 +1,80 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}My Events &middot; CareNest{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar_provider.html' with active='events' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Provider</span>
+        <h1>Health Camps &amp; Events</h1>
+        <div class="page-sub">{{ pending_count }} awaiting approval. An administrator reviews every submission
+          before patients can see it.</div>
+      </div>
+
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
+
+      {% if not profile.is_verified %}
+      <div class="callout warn">
+        <svg class="ic"><use href="#i-shield-alert"/></svg>
+        <div class="c-body">Your account isn't verified yet. You can submit events now, but they stay hidden
+          from patients until your verification goes through.</div>
+      </div>
+      {% endif %}
+
+      <div class="grid g-7-5">
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-calendar-days"/></svg> Your submissions</h3>
+          {% for e in events %}
+          <div class="lrow" style="flex-direction:column;align-items:stretch;gap:8px;">
+            <div>
+              <div class="t">{{ e.title }}
+                <span class="pill {% if e.status == 'APPROVED' %}ok{% elif e.status == 'REJECTED' %}muted{% else %}warn{% endif %}">{{ e.get_status_display }}</span></div>
+              <div class="s">{{ e.get_kind_display }} &middot; {{ e.starts_at|date:"j M Y, g:i A" }}{% if e.venue %} &middot; {{ e.venue }}{% endif %}</div>
+              {% if e.review_note %}<div class="s" style="color:#b45309;">{{ e.review_note }}</div>{% endif %}
+            </div>
+            {% if e.status == 'PENDING' %}
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="withdraw">
+              <input type="hidden" name="event_id" value="{{ e.id }}">
+              <button type="submit" class="btn btn-danger-ghost" style="padding:8px 14px;">Withdraw</button>
+            </form>
+            {% endif %}
+          </div>
+          {% empty %}
+          <p style="color:var(--muted);font-size:13.5px;">You haven't submitted any events yet.</p>
+          {% endfor %}
+        </div></div>
+
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-leaf"/></svg> Submit an event</h3>
+          <form method="post">
+            {% csrf_token %}
+            <div class="field"><label>Title</label>
+              <input type="text" name="title" class="inp" placeholder="e.g. Free diabetes screening camp" required></div>
+            <div class="field"><label>Type</label>
+              <select name="kind" class="inp">
+                {% for value, label in kinds %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+              </select></div>
+            <div class="field"><label>Starts</label>
+              <input type="datetime-local" name="starts_at" class="inp" required></div>
+            <div class="field"><label>Venue</label>
+              <input type="text" name="venue" class="inp" placeholder="Street, area, city"></div>
+            <div class="field"><label>Capacity (optional)</label>
+              <input type="number" name="capacity" class="inp" placeholder="e.g. 80"></div>
+            <label style="display:flex;align-items:center;gap:9px;font-weight:600;margin-bottom:14px;">
+              <input type="checkbox" name="is_free" checked> Free to attend</label>
+            <div class="field"><label>Description</label>
+              <textarea name="description" class="inp" rows="4" placeholder="What happens, who it's for"></textarea></div>
+            <button type="submit" class="btn btn-teal block">Submit for approval</button>
+          </form>
+        </div></div>
+      </div>
+
+{% endblock %}

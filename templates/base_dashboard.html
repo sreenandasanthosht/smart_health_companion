@@ -55,18 +55,23 @@
       <span class="hamburger"><svg class="ic"><use href="#i-menu"/></svg></span>
       <div class="search"><svg class="ic"><use href="#i-search"/></svg><input placeholder="Search anything..."></div>
       <div class="spacer"></div>
-      <button class="icon-btn"><svg class="ic"><use href="#i-bell"/></svg></button>
+      <a class="icon-btn" href="{% if user.is_authenticated %}{% url 'notifications' %}{% else %}#{% endif %}"><svg class="ic"><use href="#i-bell"/></svg></a>
       <div class="profile">
         <span class="avatar">{% if user.is_authenticated %}{{ user.initials }}{% else %}CN{% endif %}</span>
         <div>
           <div class="pn">{% if user.is_authenticated %}{{ user.display_name }}{% else %}Guest{% endif %}</div>
-          <div class="ps">{% if user.is_authenticated %}{{ user.get_role_display }}{% else %}Not signed in{% endif %}</div>
+          <div class="ps">{% if user.is_authenticated %}{{ user.admin_tier_label|default:user.get_role_display }}{% else %}Not signed in{% endif %}</div>
         </div>
         <span class="chev"><svg class="ic"><use href="#i-chevron-down"/></svg></span>
       </div>
     </header>
 
     <div class="content">
+{% if platform_notice %}
+      <div class="callout warn">
+        <svg class="ic"><use href="#i-bell"/></svg><div class="c-body">{{ platform_notice }}</div>
+      </div>
+{% endif %}
 {% block dashboard_content %}{% endblock %}
     </div>
   </div>

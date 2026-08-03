@@ -1,8 +1,8 @@
 from django.contrib import admin
 
 from health.models import (
-    ConsentGrant, HealthInsight, LifestyleLog, Medication, MedicationDose,
-    MoodLog, VitalRecord,
+    ConsentGrant, HealthDocument, HealthInsight, LifestyleLog, Medication,
+    MedicationDose, MoodLog, VitalRecord,
 )
 
 
@@ -37,10 +37,18 @@ class MoodLogAdmin(admin.ModelAdmin):
     list_display = ('patient', 'date', 'mood')
 
 
+@admin.register(HealthDocument)
+class HealthDocumentAdmin(admin.ModelAdmin):
+    list_display = ('title', 'patient', 'kind', 'issued_on', 'uploaded_at')
+    list_filter = ('kind',)
+    search_fields = ('title', 'patient__username')
+
+
 @admin.register(ConsentGrant)
 class ConsentGrantAdmin(admin.ModelAdmin):
     list_display = ('patient', 'recipient', 'scope_label', 'granted_at', 'expires_at', 'revoked_at')
-    list_filter = ('scope_vitals', 'scope_medications', 'scope_lifestyle')
+    list_filter = ('scope_vitals', 'scope_medications', 'scope_appointments',
+                   'scope_lifestyle', 'scope_documents', 'scope_ai_summary')
     search_fields = ('patient__username', 'recipient__username')
 
 

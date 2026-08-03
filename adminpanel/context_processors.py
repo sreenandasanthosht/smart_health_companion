@@ -11,17 +11,34 @@ from accounts.models import User
 
 def platform_stats(request):
     user = getattr(request, 'user', None)
-    if not (user and user.is_authenticated and user.role == User.Role.ADMIN):
+    if not (user and user.is_authenticated):
         return {}
+
+    from adminpanel.models import Complaint, PlatformSettings
+    from providers.models import HealthEvent
+
+    # The Super Admin's platform notice is for everyone who is signed in,
+    # so it is resolved before the admin-only block below.
+    context = {'platform_notice': PlatformSettings.load().platform_notice}
+
+    if user.role != User.Role.ADMIN:
+        return context
 
     from health.models import ConsentGrant
     from nursing.models import NursingVisit
     from providers.models import ProviderProfile
 
-    return {
+    context.update({
         'stat_total_users': User.objects.count(),
         'stat_pending_verifications': ProviderProfile.objects.filter(
             verification_status=ProviderProfile.Verification.PENDING).count(),
         'stat_active_shares': ConsentGrant.objects.filter(revoked_at__isnull=True).count(),
         'stat_escalations': NursingVisit.objects.filter(escalated=True).count(),
-    }
+        'stat_pending_events': HealthEvent.objects.filter(
+            status=HealthEvent.Status.PENDING).count(),
+        'stat_open_complaints': Complaint.objects.filter(
+            status__in=Complaint.OPEN_STATUSES).count(),
+        # Drives the Super-Admin-only sidebar entries.
+        'is_super_admin': user.is_platform_super_admin,
+    })
+    return context

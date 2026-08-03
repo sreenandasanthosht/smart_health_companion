@@ -8,6 +8,9 @@
 
     <nav class="nav">
       <a class="nav-item {% if active == 'dashboard' %}active{% endif %}" href="{% url 'health_caregiver_dashboard' %}"><svg class="ic"><use href="#i-home"/></svg> Monitoring</a>
+      <a class="nav-item {% if active == 'events' %}active{% endif %}" href="{% url 'public_events' %}"><svg class="ic"><use href="#i-calendar-days"/></svg> Health Camps</a>
+      <a class="nav-item {% if active == 'notifications' %}active{% endif %}" href="{% url 'notifications' %}"><svg class="ic"><use href="#i-bell"/></svg> Notifications</a>
+      <a class="nav-item {% if active == 'report' %}active{% endif %}" href="{% url 'report_problem' %}"><svg class="ic"><use href="#i-message"/></svg> Report a Problem</a>
       <a class="nav-item {% if active == 'profile' %}active{% endif %}" href="{% url 'profile' %}"><svg class="ic"><use href="#i-user"/></svg> My Profile</a>
       <a class="nav-item {% if active == 'providers' %}active{% endif %}" href="{% url 'provider_directory' %}"><svg class="ic"><use href="#i-stethoscope"/></svg> Find a Provider</a>
       <div class="nav-sep"></div>

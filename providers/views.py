@@ -11,10 +11,12 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
+from django.contrib.auth.decorators import login_required
+
 from accounts.decorators import role_required
 from accounts.models import User
 from adminpanel.models import AuditLog
-from providers.models import Appointment, ProviderProfile
+from providers.models import Appointment, HealthEvent, ProviderProfile
 
 
 @role_required(User.Role.PATIENT, User.Role.CAREGIVER)
@@ -164,3 +166,82 @@ def pending(request):
         return redirect('provider_pending')
 
     return render(request, 'providers/pending.html', {'profile': profile})
+
+
+# --------------------------------------------------------------------------
+# Health camps & wellness events
+# --------------------------------------------------------------------------
+
+@role_required(User.Role.PROVIDER)
+def my_events(request):
+    """
+    Where a provider submits health camps and wellness programmes.
+
+    Submitting always lands at PENDING. There is deliberately no code path
+    here that sets APPROVED -- only `adminpanel.views.events` can do that.
+    """
+    profile = ProviderProfile.objects.filter(user=request.user).first()
+    if profile is None:
+        messages.error(request, 'Complete your provider profile first.')
+        return redirect('provider_dashboard')
+
+    if request.method == 'POST':
+        if request.POST.get('action') == 'withdraw':
+            event = get_object_or_404(HealthEvent, pk=request.POST.get('event_id'), provider=profile)
+            event.delete()
+            messages.info(request, 'Event withdrawn.')
+            return redirect('provider_events')
+
+        title = request.POST.get('title', '').strip()
+        starts_raw = request.POST.get('starts_at', '').strip()
+        if not (title and starts_raw):
+            messages.error(request, 'An event needs at least a title and a start date/time.')
+            return redirect('provider_events')
+        try:
+            starts_at = datetime.datetime.fromisoformat(starts_raw)
+            if timezone.is_naive(starts_at):
+                starts_at = timezone.make_aware(starts_at)
+        except ValueError:
+            messages.error(request, 'Please enter a valid start date and time.')
+            return redirect('provider_events')
+
+        capacity = request.POST.get('capacity', '').strip()
+        event = HealthEvent.objects.create(
+            provider=profile, title=title,
+            kind=request.POST.get('kind', HealthEvent.Kind.CAMP),
+            description=request.POST.get('description', '').strip(),
+            venue=request.POST.get('venue', '').strip(),
+            starts_at=starts_at,
+            capacity=int(capacity) if capacity.isdigit() else None,
+            is_free=bool(request.POST.get('is_free')),
+        )
+        AuditLog.record(request.user, 'Submitted a health event', event.title, AuditLog.Tag.WARN)
+        messages.success(request, 'Submitted. An administrator reviews it before it goes public.')
+        return redirect('provider_events')
+
+    events = HealthEvent.objects.filter(provider=profile)
+    context = {
+        'profile': profile,
+        'events': events,
+        'pending_count': sum(1 for e in events if e.status == HealthEvent.Status.PENDING),
+        'kinds': HealthEvent.Kind.choices,
+    }
+    return render(request, 'providers/events.html', context)
+
+
+@login_required
+def public_events(request):
+    """
+    The patient-facing listing. Reads `HealthEvent.public()` and nothing
+    else, so an unapproved or expired event has no route to this page.
+    """
+    events = HealthEvent.public()
+    kind = request.GET.get('kind', '').strip()
+    if kind:
+        events = events.filter(kind=kind)
+    context = {
+        'events': events,
+        'selected_kind': kind,
+        'kinds': HealthEvent.Kind.choices,
+    }
+    return render(request, 'providers/public_events.html', context)

@@ -29,8 +29,12 @@
             </div>
           </div>
           <div class="field" id="caregiver-field" style="display:none;">
-            <label>{{ form.caregiver_patient_id.label }}</label>
-            {{ form.caregiver_patient_id }}{{ form.caregiver_patient_id.errors }}
+            <label>{{ form.caregiver_patient_ref.label }}</label>
+            {{ form.caregiver_patient_ref }}{{ form.caregiver_patient_ref.errors }}
+            <div style="font-size:12.5px;color:var(--muted);margin-top:6px;">
+              Any one of these works &mdash; the ID from the top of their dashboard, the email
+              they signed up with, or an invite code they generated for you.
+            </div>
           </div>
           <div class="field" id="provider-field" style="display:none;">
             <label>Provider type</label>

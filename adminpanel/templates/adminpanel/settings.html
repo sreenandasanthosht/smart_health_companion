@@ -1,0 +1,59 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Settings &middot; CareNest{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar_admin.html' with active='settings' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Super Admin</span>
+        <h1>System Settings</h1>
+        <div class="page-sub">Each of these changes real behaviour immediately. Last updated
+          {{ config.updated_at|date:"j M Y, g:i A" }}{% if config.updated_by %} by {{ config.updated_by.display_name }}{% endif %}.</div>
+      </div>
+
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
+
+      <div class="panel" style="max-width:640px;"><div class="p-body tall">
+        <form method="post">
+          {% csrf_token %}
+
+          <div class="field">
+            <label style="display:flex;align-items:center;gap:9px;font-weight:600;">
+              <input type="checkbox" name="provider_self_registration_open"
+                     {% if config.provider_self_registration_open %}checked{% endif %}>
+              Provider self-registration open</label>
+            <div style="font-size:12.5px;color:var(--muted);margin-top:6px;">
+              When off, Provider is removed from the public sign-up form and a crafted submission
+              choosing it is rejected. Patients and caregivers are unaffected.
+            </div>
+          </div>
+
+          <div class="field">
+            <label style="display:flex;align-items:center;gap:9px;font-weight:600;">
+              <input type="checkbox" name="caregiver_device_approval_required"
+                     {% if config.caregiver_device_approval_required %}checked{% endif %}>
+              Require patient approval for new caregiver devices</label>
+            <div style="font-size:12.5px;color:var(--muted);margin-top:6px;">
+              When off, a caregiver signing in from an unrecognised browser is let straight through.
+              Turning this off weakens the caregiver security model &mdash; do it only if patients
+              are being locked out in practice.
+            </div>
+          </div>
+
+          <div class="field"><label>Platform notice</label>
+            <input type="text" name="platform_notice" class="inp" maxlength="255"
+                   value="{{ config.platform_notice }}" placeholder="Leave blank for none">
+            <div style="font-size:12.5px;color:var(--muted);margin-top:6px;">
+              Shown as a banner to every signed-in user. Useful for planned downtime.
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-teal block">Save settings</button>
+        </form>
+      </div></div>
+
+{% endblock %}

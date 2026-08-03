@@ -73,14 +73,21 @@
                 {% endfor %}
               </select></div>
             <div class="field"><label>What to include</label>
+              {% for value, label, default_on in standard_scopes %}
               <label style="display:flex;align-items:center;gap:9px;font-weight:600;margin-bottom:8px;">
-                <input type="checkbox" name="scope" value="VITALS" checked> Vitals</label>
+                <input type="checkbox" name="scope" value="{{ value }}" {% if default_on %}checked{% endif %}> {{ label }}</label>
+              {% endfor %}
+            </div>
+
+            <div class="field">
+              <label>Restricted &mdash; off unless you tick it</label>
+              <div style="font-size:12.5px;color:var(--muted);margin:-4px 0 8px;">
+                These are the sensitive ones. They stay hidden even from an approved caregiver until you share them here.
+              </div>
+              {% for value, label in restricted_scopes %}
               <label style="display:flex;align-items:center;gap:9px;font-weight:600;margin-bottom:8px;">
-                <input type="checkbox" name="scope" value="MEDICATIONS" checked> Medications</label>
-              <label style="display:flex;align-items:center;gap:9px;font-weight:600;margin-bottom:8px;">
-                <input type="checkbox" name="scope" value="RECORDS"> Lab / prescription records</label>
-              <label style="display:flex;align-items:center;gap:9px;font-weight:600;margin-bottom:8px;">
-                <input type="checkbox" name="scope" value="LIFESTYLE"> Lifestyle logs</label>
+                <input type="checkbox" name="scope" value="{{ value }}"> {{ label }}</label>
+              {% endfor %}
               <label style="display:flex;align-items:center;gap:9px;font-weight:600;color:var(--muted);">
                 <input type="checkbox" disabled> Mental health (never shareable)</label>
             </div>

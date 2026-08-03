@@ -1,0 +1,88 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Admin Management &middot; CareNest{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar_admin.html' with active='admins' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Super Admin</span>
+        <h1>Admin Management</h1>
+        <div class="page-sub">{{ admins|length }} admin {{ admins|length|pluralize:"account,accounts" }},
+          {{ super_count }} with Super Admin rights. This is the only place an admin account can be created.</div>
+      </div>
+
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
+
+      <div class="grid g-7-5">
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-users"/></svg> Existing admins</h3>
+          <table class="dtable">
+            <thead><tr><th>Name</th><th>Tier</th><th>Joined</th><th></th></tr></thead>
+            <tbody>
+              {% for a in admins %}
+              <tr>
+                <td>
+                  <div class="t">{{ a.display_name }}{% if a == user %} <span class="pill muted">You</span>{% endif %}</div>
+                  <div class="s">{{ a.email }}</div>
+                </td>
+                <td><span class="pill {% if a.is_super_admin %}ok{% else %}muted{% endif %}">
+                  {% if a.is_super_admin %}Super Admin{% else %}Admin{% endif %}</span></td>
+                <td class="s">{{ a.date_joined|date:"j M Y" }}</td>
+                <td>
+                  {% if a != user %}
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                    <form method="post">
+                      {% csrf_token %}
+                      <input type="hidden" name="user_id" value="{{ a.id }}">
+                      {% if a.is_super_admin %}
+                      <button type="submit" name="action" value="demote" class="btn btn-ghost">Make standard</button>
+                      {% else %}
+                      <button type="submit" name="action" value="promote" class="btn btn-ghost">Make super</button>
+                      {% endif %}
+                    </form>
+                    <form method="post">
+                      {% csrf_token %}
+                      <input type="hidden" name="user_id" value="{{ a.id }}">
+                      <button type="submit" name="action" value="revoke" class="btn btn-danger-ghost">Revoke</button>
+                    </form>
+                  </div>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <div class="callout warn" style="margin-top:14px;margin-bottom:0;">
+            <svg class="ic"><use href="#i-shield-alert"/></svg>
+            <div class="c-body">Revoking returns the account to a Patient role rather than deleting it,
+              so their audit history stays attributable.</div>
+          </div>
+        </div></div>
+
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-shield-alert"/></svg> Create an admin</h3>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create">
+            <div class="field"><label>Full name</label>
+              <input type="text" name="full_name" class="inp" placeholder="e.g. Rahul Menon" required></div>
+            <div class="field"><label>Email</label>
+              <input type="email" name="email" class="inp" placeholder="them@example.com" required></div>
+            <div class="field"><label>Temporary password</label>
+              <input type="password" name="password" class="inp" placeholder="They should change it after first login" required></div>
+            <label style="display:flex;align-items:center;gap:9px;font-weight:600;margin-bottom:14px;">
+              <input type="checkbox" name="is_super_admin"> Give Super Admin rights</label>
+            <button type="submit" class="btn btn-teal block">Create account</button>
+          </form>
+          <div class="callout muted" style="margin-top:14px;margin-bottom:0;">
+            <svg class="ic"><use href="#i-clock"/></svg>
+            <div class="c-body">Admin is not a sign-up role. Nobody can reach this tier except through this form.</div>
+          </div>
+        </div></div>
+      </div>
+
+{% endblock %}
