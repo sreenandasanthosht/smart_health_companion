@@ -21,7 +21,11 @@
             <div class="ai-title"><svg class="ic"><use href="#i-sparkles"/></svg> Health Summary</div>
             <div class="ai-list">
               {% for insight in insights|slice:":4" %}
-              <div class="li"><span class="ck"><svg class="ic"><use href="#i-check"/></svg></span> {{ insight.text }}</div>
+              <div class="li">
+                <span class="ck {% if insight.level == 'CRITICAL' %}crit{% elif insight.level == 'WARNING' %}warn{% endif %}">
+                  <svg class="ic"><use href="#{% if insight.level == 'INFO' %}i-check{% else %}i-shield-alert{% endif %}"/></svg>
+                </span> {{ insight.text }}
+              </div>
               {% endfor %}
             </div>
           </div>

@@ -1,25 +1,38 @@
 # data/
 
-Drop `db_drug_interactions.csv` here (this exact filename/path is what
-`scripts/verify_drug_csv.py` and the Session 5 interaction-checker code
-look for).
+Datasets used by CareNest.
 
-Expected columns (confirmed against the real file on 2026-07-02):
+## Current contents
 
-| Column | Example |
-|---|---|
-| `Drug 1` | Trioxsalen |
-| `Drug 2` | Verteporfin |
-| `Interaction Description` | Trioxsalen may increase the photosensitizing activities of Verteporfin. |
+Nothing is required here to run the application. The demo data used for
+development and review is generated, not downloaded — create it with:
 
-Notes:
-- No blank rows/values confirmed.
-- This is a flat lookup file, not a Django model. It's read directly (via
-  `csv`/`pandas`) inside the Session 5 interaction-checking code — there's
-  no migration or table for it, since a static reference file doesn't need
-  one.
-- This file is listed in `.gitignore` if it's large or contains data you
-  don't want in the public repo history — check with your teammate before
-  committing it. If it's small enough and fine to share, commit it normally
-  so Terese's environment also has it (not required for her lane, but
-  keeps the repo self-contained for the final submission).
+```
+python manage.py seed_demo
+```
+
+The synthetic cohort for the data-science models (Phase 5) will also be
+generated rather than stored, via `python manage.py generate_cohort`. Its
+generation assumptions are written to `reports/synthetic_data_assumptions.md`
+at the time it runs, so the dataset is always reproducible from the seed.
+
+## Retired: db_drug_interactions.csv
+
+A 22 MB drug-drug interaction lookup table used to live here. It has been
+retired and moved to `_to_delete/`.
+
+Drug-drug interaction checking was removed from the project scope following
+review feedback (task 2.1 in the task plan). Automatically flagging
+interactions is a clinical decision-support function, and this project makes
+no clinical claim. It was replaced by the medication card plus a
+"show this to your doctor" prompt, which keeps the patient informed without
+the application making a clinical judgement.
+
+The file was a flat CSV read directly at request time, not a Django model,
+so retiring it required no migration and left no schema behind.
+
+## Rule for anything added here
+
+No real patient data, ever. Every dataset in this project is either
+synthetic or a public reference file, and its origin is recorded in this
+file when it is added.

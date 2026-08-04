@@ -9,6 +9,7 @@ Run with:  python manage.py test
 """
 import datetime
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -16,7 +17,8 @@ from django.utils import timezone
 
 from accounts.models import CaregiverLink
 from health.models import (
-    ConsentGrant, LifestyleLog, Medication, MedicationDose, MoodLog, VitalRecord,
+    ConsentGrant, ExtractionJob, LifestyleLog, Medication, MedicationDose,
+    MoodLog, VitalRecord,
 )
 from nursing.models import NurseAssignment, NursingVisit
 from providers.models import Appointment, ProviderProfile
@@ -91,6 +93,23 @@ class RegistrationFlowTests(TestCase):
             resp = self.client.post(reverse('login'), {'email': email, 'password': PW})
             self.assertRedirects(resp, target, fetch_redirect_response=False)
             self.client.logout()
+
+    def test_login_works_when_username_differs_from_email(self):
+        # createsuperuser lets username and email diverge. Such an account
+        # must still be able to sign in with its email address.
+        u = User.objects.create_user(
+            username='admin', email='admin.shc@email.com', password=PW,
+            role=User.Role.ADMIN)
+        resp = self.client.post(reverse('login'),
+                                {'email': 'admin.shc@email.com', 'password': PW})
+        self.assertRedirects(resp, reverse('admin_dashboard'), fetch_redirect_response=False)
+        self.assertEqual(int(self.client.session['_auth_user_id']), u.pk)
+
+    def test_login_is_case_insensitive_on_email(self):
+        make('MixedCase@Example.com', User.Role.PATIENT)
+        resp = self.client.post(reverse('login'),
+                                {'email': 'mixedcase@example.com', 'password': PW})
+        self.assertRedirects(resp, reverse('health_dashboard'), fetch_redirect_response=False)
 
     def test_suspended_user_cannot_log_in(self):
         make('susp@example.com', User.Role.PATIENT, is_suspended=True)
@@ -384,3 +403,220 @@ class SeedCommandTests(TestCase):
         self.assertGreater(first, 0)
         call_command('seed_demo', stdout=StringIO())
         self.assertEqual(User.objects.count(), first, 'seed_demo should not duplicate accounts')
+
+
+class ExtractionTests(TestCase):
+    """
+    Prescription extraction, including the privacy guarantee.
+
+    OCR is stubbed so these tests do not need Tesseract installed and do not
+    depend on image recognition quality. What they verify is the pipeline:
+    consent gating, the parser, the verify-then-save flow, and above all that
+    no uploaded file survives the request.
+    """
+
+    def setUp(self):
+        self.patient = make('rx@example.com', User.Role.PATIENT)
+        self.client.force_login(self.patient)
+        self.sample_text = (
+            'Dr. A Nair, City Care Clinic\n'
+            'Tab. Metformin 500mg 1-0-1 x 30 days\n'
+            'Cap. Amlodipine 5mg OD x 30 days\n'
+            'Follow up after 1 month\n'
+        )
+
+    def _upload(self, consent=True, name='rx.jpg', content=b'\xff\xd8\xff\xe0fakejpeg'):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        data = {'document': SimpleUploadedFile(name, content, content_type='image/jpeg'),
+                'source_type': 'PRESCRIPTION'}
+        if consent:
+            data['consent'] = '1'
+        return self.client.post(reverse('health_prescription_upload'), data, follow=True)
+
+    # --- the privacy guarantee -------------------------------------------
+
+    def test_uploaded_file_is_never_written_to_disk(self):
+        """Walk the project tree before and after; no new file may appear."""
+        import os
+        from unittest.mock import patch
+
+        root = settings.BASE_DIR
+
+        def snapshot():
+            found = set()
+            for dirpath, dirnames, filenames in os.walk(root):
+                dirnames[:] = [d for d in dirnames
+                               if d not in {'venv', '.venv', '__pycache__', '.git', 'node_modules'}]
+                for fn in filenames:
+                    found.add(os.path.join(dirpath, fn))
+            return found
+
+        before = snapshot()
+        with patch('health.extraction.extract_text', return_value=(self.sample_text, 88.0)):
+            self._upload()
+        after = snapshot()
+
+        new_files = {f for f in after - before if not f.endswith(('.pyc', '.log'))}
+        self.assertEqual(new_files, set(),
+                         f'Upload left files behind: {new_files}')
+
+    def test_job_records_that_the_file_was_released(self):
+        from unittest.mock import patch
+        with patch('health.extraction.extract_text', return_value=(self.sample_text, 88.0)):
+            self._upload()
+        job = ExtractionJob.objects.get(patient=self.patient)
+        self.assertIsNotNone(job.file_deleted_at)
+        self.assertEqual(job.original_filename, 'rx.jpg')
+
+    def test_settings_force_uploads_to_stay_in_memory(self):
+        # If this ever changes, large uploads silently start hitting disk and
+        # the process-and-discard claim quietly becomes false.
+        self.assertEqual(settings.FILE_UPLOAD_HANDLERS,
+                         ['django.core.files.uploadhandler.MemoryFileUploadHandler'])
+
+    # --- consent gating ---------------------------------------------------
+
+    def test_upload_without_consent_is_rejected_and_nothing_is_processed(self):
+        from unittest.mock import patch
+        with patch('health.extraction.extract_text') as ocr:
+            self._upload(consent=False)
+            ocr.assert_not_called()
+        self.assertEqual(ExtractionJob.objects.count(), 0)
+
+    def test_refused_consent_is_written_to_the_audit_log(self):
+        from adminpanel.models import AuditLog
+        self._upload(consent=False)
+        self.assertTrue(AuditLog.objects.filter(action__icontains='Refused consent').exists())
+
+    # --- parsing ----------------------------------------------------------
+
+    def test_rule_based_parser_reads_a_typical_prescription(self):
+        from health.extraction import parse_medications_rules
+        items = parse_medications_rules(self.sample_text)
+        names = {i['name'].lower() for i in items}
+        self.assertIn('metformin', names)
+        self.assertIn('amlodipine', names)
+        # Clinic and follow-up lines must not be mistaken for medicines.
+        self.assertNotIn('city care clinic', names)
+        metformin = next(i for i in items if i['name'].lower() == 'metformin')
+        self.assertEqual(metformin['dose'].replace(' ', ''), '500mg')
+        self.assertEqual(metformin['frequency'], 'Morning and night')
+        self.assertGreaterEqual(metformin['confidence'], 0.8)
+
+    def test_rule_based_parser_reads_a_numbered_indian_style_prescription(self):
+        """
+        Regression test for a real upload that returned 0 medicines.
+
+        Two things about this format previously broke the parser: (1) each
+        medicine line starts with a list number ("1)", "2)") which sat in
+        front of "TAB." and defeated the anchored form-prefix match, and
+        (2) frequency was written in plain words ("1 Morning", "4 Morning,
+        1 Night") rather than a coded notation like OD/BD/1-0-1.
+        """
+        from health.extraction import parse_medications_rules
+        text = (
+            "'Medicine Name: Dosage 'Duration\n"
+            "1) TAB. ABCOINA 1 Morning 8 bays\n"
+            "(Tot8 Tab)\n"
+            "2) TAB. VOMIAST 4 Morning, 1 Night 'Days\n"
+        )
+        items = parse_medications_rules(text)
+        names = {i['name'].lower() for i in items}
+        self.assertIn('abcoina', names)
+        self.assertIn('vomiast', names)
+        abcoina = next(i for i in items if i['name'].lower() == 'abcoina')
+        self.assertEqual(abcoina['frequency'], '1 Morning')
+        self.assertIn('8', abcoina['duration'])
+
+    def test_parser_falls_back_to_rules_when_the_llm_fails(self):
+        from unittest.mock import patch
+        from health import extraction
+        with patch.object(extraction, 'llm_available', return_value=True), \
+             patch.object(extraction, 'parse_medications_llm',
+                          side_effect=extraction.ExtractionError('boom')):
+            items, parser, note = extraction.parse_medications(self.sample_text)
+        self.assertEqual(parser, 'RULES')
+        self.assertIn('boom', note)
+        self.assertTrue(items, 'fallback should still return medicines')
+
+    def test_parser_is_recorded_on_the_job(self):
+        from unittest.mock import patch
+        with patch('health.extraction.extract_text', return_value=(self.sample_text, 88.0)):
+            self._upload()
+        job = ExtractionJob.objects.get(patient=self.patient)
+        self.assertIn(job.parser_used, {'LLM', 'RULES'})
+
+    # --- verify-then-save flow -------------------------------------------
+
+    def test_nothing_is_added_to_medicines_until_confirmed(self):
+        from unittest.mock import patch
+        with patch('health.extraction.extract_text', return_value=(self.sample_text, 88.0)):
+            self._upload()
+        self.assertEqual(Medication.objects.filter(patient=self.patient).count(), 0)
+
+    def test_confirming_creates_medicines_and_clears_the_text(self):
+        from unittest.mock import patch
+        with patch('health.extraction.extract_text', return_value=(self.sample_text, 88.0)):
+            self._upload()
+        job = ExtractionJob.objects.get(patient=self.patient)
+        self.assertTrue(job.raw_text)
+        post = {'action': 'confirm'}
+        for item in job.medications.all():
+            post[f'keep_{item.id}'] = '1'
+            post[f'name_{item.id}'] = item.name
+            post[f'dose_{item.id}'] = item.dose
+            post[f'frequency_{item.id}'] = item.frequency
+        self.client.post(reverse('health_extraction_verify', args=[job.id]), post)
+        job.refresh_from_db()
+        self.assertEqual(job.status, ExtractionJob.Status.CONFIRMED)
+        self.assertEqual(job.raw_text, '', 'transcribed text should be cleared on confirm')
+        self.assertGreater(Medication.objects.filter(patient=self.patient).count(), 0)
+
+    def test_discarding_saves_nothing_and_clears_the_text(self):
+        from unittest.mock import patch
+        with patch('health.extraction.extract_text', return_value=(self.sample_text, 88.0)):
+            self._upload()
+        job = ExtractionJob.objects.get(patient=self.patient)
+        self.client.post(reverse('health_extraction_verify', args=[job.id]), {'action': 'discard'})
+        job.refresh_from_db()
+        self.assertEqual(job.status, ExtractionJob.Status.DISCARDED)
+        self.assertEqual(job.raw_text, '')
+        self.assertEqual(Medication.objects.filter(patient=self.patient).count(), 0)
+
+    # --- isolation and failure handling ----------------------------------
+
+    def test_a_patient_cannot_open_another_patients_extraction(self):
+        from unittest.mock import patch
+        with patch('health.extraction.extract_text', return_value=(self.sample_text, 88.0)):
+            self._upload()
+        job = ExtractionJob.objects.get(patient=self.patient)
+        other = make('nosy@example.com', User.Role.PATIENT)
+        self.client.force_login(other)
+        resp = self.client.get(reverse('health_extraction_verify', args=[job.id]))
+        self.assertEqual(resp.status_code, 404)
+
+    def test_unreadable_image_fails_gracefully(self):
+        resp = self._upload(content=b'not an image at all')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(Medication.objects.filter(patient=self.patient).count(), 0)
+
+    def test_blank_ocr_result_is_reported_not_crashed(self):
+        from unittest.mock import patch
+        with patch('health.extraction.extract_text', return_value=('', 0.0)):
+            resp = self._upload()
+        self.assertEqual(resp.status_code, 200)
+        job = ExtractionJob.objects.get(patient=self.patient)
+        self.assertEqual(job.status, ExtractionJob.Status.FAILED)
+
+    def test_oversized_upload_is_rejected(self):
+        from health.extraction import ExtractionError, validate_upload
+
+        class Fake:
+            size = 40 * 1024 * 1024
+            content_type = 'image/jpeg'
+        with self.assertRaises(ExtractionError):
+            validate_upload(Fake())
+
+    def test_non_patient_cannot_reach_the_upload_page(self):
+        self.client.force_login(make('prov2@example.com', User.Role.PROVIDER))
+        self.assertEqual(self.client.get(reverse('health_prescription_upload')).status_code, 302)

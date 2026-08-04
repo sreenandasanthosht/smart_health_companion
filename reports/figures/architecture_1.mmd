@@ -1,0 +1,39 @@
+flowchart TD
+    subgraph client["Presentation — browser"]
+        UI["Django templates + CSS<br/>five role-specific dashboards<br/>server-rendered, no JS framework"]
+    end
+
+    subgraph app["Application — Django views"]
+        RBAC["@role_required<br/>role-based access control<br/>accounts/decorators.py"]
+        VIEWS["View functions<br/>accounts · health · providers<br/>nursing · adminpanel"]
+    end
+
+    subgraph services["Services"]
+        CONSENT["Consent service<br/>ConsentGrant + has_consent()<br/>scope · expiry · revocation"]
+        ANALYTICS["Analytics<br/>health/analytics.py<br/>score · trends · rule-based insights"]
+        AUDIT["Audit service<br/>AuditLog.record()<br/>append-only"]
+    end
+
+    subgraph data["Data — relational only"]
+        DB[("SQLite (dev) / MySQL (option)<br/>accounts · health · providers<br/>nursing · adminpanel")]
+    end
+
+    NOSTORE["No media store<br/>documents are processed<br/>in memory and discarded"]
+
+    UI -->|"HTTP form POST / GET"| RBAC
+    RBAC -->|"role permitted"| VIEWS
+    RBAC -.->|"role denied → redirect"| UI
+    VIEWS --> CONSENT
+    VIEWS --> ANALYTICS
+    VIEWS --> AUDIT
+    CONSENT -->|"grant / deny"| VIEWS
+    CONSENT --> DB
+    ANALYTICS --> DB
+    AUDIT --> DB
+    VIEWS --> DB
+    VIEWS -.-> NOSTORE
+
+    style NOSTORE stroke-dasharray: 5 5
+    style CONSENT fill:#e8f0ee
+    style AUDIT fill:#e8f0ee
+    style ANALYTICS fill:#e8f0ee

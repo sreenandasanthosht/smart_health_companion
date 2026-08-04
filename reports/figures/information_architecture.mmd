@@ -1,0 +1,19 @@
+flowchart TD
+    LOGIN[/"Login<br/>/accounts/login/"/]
+    LOGIN --> ROUTE{"role?"}
+
+    ROUTE -->|PATIENT| P0["Dashboard<br/>/health/dashboard/"]
+    ROUTE -->|CAREGIVER| C0["Monitoring<br/>/health/caregiver-dashboard/"]
+    ROUTE -->|PROVIDER| V0["Dashboard<br/>/providers/dashboard/"]
+    ROUTE -->|NURSE| N0["My Patients<br/>/nursing/dashboard/"]
+    ROUTE -->|ADMIN| A0["Dashboard<br/>/admin-panel/dashboard/"]
+
+    P0 --- P1["Log Vitals"] --- P2["Manage Medicines"] --- P3["Appointments"]
+    P3 --- P4["Find a Provider"] --- P5["Lifestyle"] --- P6["Mental Health"]
+    P6 --- P7["Share Records"] --- P8["Caregivers"] --- P9["My Profile"]
+
+    C0 --- C1["Find a Provider"] --- C2["My Profile"]
+    V0 --- V1["Verification Status"] --- V2["My Profile"]
+    N0 --- N1["Visit History"] --- N2["My Profile"]
+    A0 --- A1["Provider Verification"] --- A2["Users"] --- A3["Providers"]
+    A3 --- A4["Nursing"] --- A5["Audit Log"]

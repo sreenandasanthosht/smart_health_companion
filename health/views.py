@@ -7,6 +7,7 @@ pages is placeholder data any more.
 """
 import datetime
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
@@ -21,9 +22,12 @@ from accounts.models import (
 )
 from adminpanel.models import AuditLog
 from health import analytics
+from health import extraction
 from health.models import (
     ConsentGrant, HealthDocument, LifestyleLog, Medication, MedicationDose,
     MoodLog, SCOPE_FIELDS, VitalRecord, consent_matrix, has_consent,
+    ConsentGrant, ExtractedMedication, ExtractionJob, LifestyleLog, Medication,
+    MedicationDose, MoodLog, VitalRecord, has_consent,
 )
 from providers.models import Appointment, ProviderProfile
 
@@ -776,4 +780,151 @@ def caregiver_requests(request):
         'pending_devices': TrustedDevice.objects.filter(
             patient=request.user, status=TrustedDevice.Status.PENDING).select_related('user'),
         'invites': CaregiverInvite.objects.filter(patient=request.user)[:8],
+    })
+
+
+# --------------------------------------------------------------------------
+# Prescription extraction — process and discard
+# --------------------------------------------------------------------------
+
+@role_required(User.Role.PATIENT)
+def prescription_upload(request):
+    """
+    Read an uploaded prescription, extract the medicines, and discard the file.
+
+    The uploaded bytes are held in memory only. Settings force Django's
+    in-memory upload handler so a large file cannot be spilled to a temp file,
+    and nothing here ever calls save() on the upload.
+    """
+    if request.method == 'POST':
+        uploaded = request.FILES.get('document')
+        consented = bool(request.POST.get('consent'))
+
+        if not uploaded:
+            messages.error(request, 'Choose a photo of your prescription first.')
+            return redirect('health_prescription_upload')
+
+        # Consent gate. Refusals are logged too, so the audit trail shows
+        # attempted-but-refused processing, not just what succeeded.
+        if not consented:
+            AuditLog.record(request.user, 'Refused consent for document extraction',
+                            uploaded.name[:100], AuditLog.Tag.WARN)
+            messages.error(request,
+                           'We can only read your prescription if you tick the box to allow it.')
+            return redirect('health_prescription_upload')
+
+        # Keep the display name before we release the upload object. We store
+        # the bare filename only -- never a path, and never the file itself.
+        display_name = uploaded.name[:255]
+
+        try:
+            extraction.validate_upload(uploaded)
+            file_bytes = uploaded.read()          # into memory, never to disk
+            text, confidence = extraction.extract_text(file_bytes, display_name)
+        except extraction.ExtractionError as exc:
+            AuditLog.record(request.user, 'Document extraction failed',
+                            str(exc)[:150], AuditLog.Tag.WARN)
+            messages.error(request, str(exc))
+            return redirect('health_prescription_upload')
+        finally:
+            # Release the bytes as early as possible, whatever happened.
+            file_bytes = None
+            uploaded = None
+
+        job = ExtractionJob.objects.create(
+            patient=request.user,
+            source_type=request.POST.get('source_type', ExtractionJob.Source.PRESCRIPTION),
+            original_filename=display_name,
+            raw_text=text,
+            ocr_confidence=confidence,
+            file_deleted_at=timezone.now(),       # the bytes are already gone
+        )
+
+        if not text.strip():
+            job.status = ExtractionJob.Status.FAILED
+            job.parser_note = 'No readable text found in the image.'
+            job.save(update_fields=['status', 'parser_note'])
+            messages.error(request,
+                           "We couldn't read any text in that image. Try a sharper, "
+                           'better-lit photo taken straight on.')
+            return redirect('health_prescription_upload')
+
+        items, parser_used, note = extraction.parse_medications(text)
+        job.parser_used = parser_used
+        job.parser_note = note[:200]
+        job.save(update_fields=['parser_used', 'parser_note'])
+
+        for item in items:
+            ExtractedMedication.objects.create(job=job, **item)
+
+        AuditLog.record(request.user, 'Extracted a document',
+                        f'{len(items)} medicine(s) found, parser={parser_used}',
+                        AuditLog.Tag.OK)
+
+        if not items:
+            messages.warning(request,
+                             'We read the image but could not identify any medicines. '
+                             'You can add them by hand instead.')
+        return redirect('health_extraction_verify', job_id=job.id)
+
+    return render(request, 'health/prescription_upload.html', {
+        'llm_in_use': extraction.llm_available(),
+        'llm_model': getattr(settings, 'LLM_MODEL', ''),
+        'recent': ExtractionJob.objects.filter(patient=request.user)[:5],
+    })
+
+
+@role_required(User.Role.PATIENT)
+def extraction_verify(request, job_id):
+    """The patient corrects what was extracted before anything is saved."""
+    job = get_object_or_404(ExtractionJob, pk=job_id, patient=request.user)
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'discard':
+            job.status = ExtractionJob.Status.DISCARDED
+            job.save(update_fields=['status'])
+            job.clear_text()
+            AuditLog.record(request.user, 'Discarded an extraction', '', AuditLog.Tag.MUTED)
+            messages.info(request, 'Discarded. Nothing was added to your medicines.')
+            return redirect('health_prescription_upload')
+
+        created = 0
+        for item in job.medications.all():
+            if not request.POST.get(f'keep_{item.id}'):
+                continue
+            name = request.POST.get(f'name_{item.id}', '').strip()
+            if not name:
+                continue
+            item.name = name[:120]
+            item.dose = request.POST.get(f'dose_{item.id}', '').strip()[:60]
+            item.frequency = request.POST.get(f'frequency_{item.id}', '').strip()[:120]
+            item.confirmed = True
+            item.save(update_fields=['name', 'dose', 'frequency', 'confirmed'])
+
+            Medication.objects.create(
+                patient=request.user, name=item.name,
+                dose=item.dose or 'As prescribed',
+                schedule=item.frequency or 'As prescribed',
+                start_date=timezone.localdate(),
+            )
+            created += 1
+
+        job.status = ExtractionJob.Status.CONFIRMED
+        job.save(update_fields=['status'])
+        job.clear_text()          # transcribed text is no longer needed
+        AuditLog.record(request.user, 'Confirmed extracted medicines',
+                        f'{created} added', AuditLog.Tag.OK)
+
+        if created:
+            messages.success(request,
+                             f'{created} medicine{"s" if created != 1 else ""} added.')
+        else:
+            messages.info(request, 'Nothing was added.')
+        return redirect('health_medications')
+
+    return render(request, 'health/extraction_verify.html', {
+        'job': job,
+        'items': job.medications.all(),
     })

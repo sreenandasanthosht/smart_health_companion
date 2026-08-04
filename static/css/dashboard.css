@@ -501,3 +501,12 @@ textarea.inp { resize:vertical; min-height:70px; }
 .auth-card input:focus, .auth-card select:focus, .auth-card textarea:focus {
     border-color: var(--brand); box-shadow: 0 0 0 3px rgba(20,184,166,.15); background: #fff;
 }
+
+/* Health Summary bullet severity (INFO = green tick, WARNING/CRITICAL = alert) */
+.ai-list .li .ck.warn { background: var(--amber-500, #f59e0b); }
+.ai-list .li .ck.crit { background: var(--red-500, #dc2626); }
+
+/* Keep the decorative plant clear of the journey box's text */
+.journey { padding-bottom: 26px; }
+.journey .step:last-of-type { margin-bottom: 4px; }
+.journey .step .t, .journey .step .s { max-width: 150px; }

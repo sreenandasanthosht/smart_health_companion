@@ -1,14 +1,7 @@
 # Normalise line endings.
-#
-# Without this, a file edited on Windows (CRLF) and one edited on Mac/Linux
-# (LF) look completely rewritten to Git even when the text is identical --
-# which makes diffs unreadable and causes a merge conflict on every file.
-#
-# `text=auto` stores everything as LF in the repository and converts to the
-# platform's native ending on checkout. Nobody has to think about it again.
 * text=auto
 
-# Binary files: never touch these.
+# Binary files
 *.png binary
 *.jpg binary
 *.jpeg binary
@@ -21,3 +14,5 @@
 *.gz binary
 *.zip binary
 *.sqlite3 binary
+
+*.csv binary
