@@ -13,4 +13,12 @@ urlpatterns = [
     path('providers/', views.providers, name='admin_providers'),
     path('audit-log/', views.audit_log, name='admin_audit_log'),
     path('nursing/', views.nursing, name='admin_nursing'),
+    path('caregivers/', views.caregivers, name='admin_caregivers'),
+    path('complaints/', views.complaints, name='admin_complaints'),
+    path('events/', views.events, name='admin_events'),
+    path('announcements/', views.announcements, name='admin_announcements'),
+    path('analytics/', views.analytics, name='admin_analytics'),
+    # Super Admin only.
+    path('admins/', views.admin_accounts, name='admin_accounts'),
+    path('settings/', views.settings_view, name='admin_settings'),
 ]

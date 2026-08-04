@@ -5,12 +5,13 @@
 {% block dashboard_content %}
 
       {% for message in messages %}
-      <div class="callout {% if message.tags == 'error' %}danger{% else %}info{% endif %}">
+      <div class="callout {% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warn{% else %}info{% endif %}">
         <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
       </div>
       {% endfor %}
 
       {% if not link %}
+      {# ---------- Not linked yet ---------- #}
       <div class="page-head">
         <span class="chip-role">Caregiver</span>
         <h1>No patient linked yet</h1>
@@ -27,37 +28,75 @@
 
       <div class="panel" style="max-width:520px;"><div class="p-body tall">
         <h3 class="p-h"><svg class="ic"><use href="#i-users"/></svg> Request access to a patient</h3>
-        <p style="color:var(--muted);font-size:13.5px;margin:0 0 14px;">Ask the patient for their CareNest ID &mdash; they'll find it at the top of their own dashboard.</p>
+        <p style="color:var(--muted);font-size:13.5px;margin:0 0 14px;">Enter any one of these &mdash; the
+          CareNest ID from the top of their dashboard, the email they signed up with, or an invite code they sent you.</p>
         <form method="post" action="{% url 'health_caregiver_link' %}">
           {% csrf_token %}
-          <div class="field"><label>Patient ID</label>
-            <input type="text" name="patient_id" class="inp" placeholder="e.g. 4F2A9C1B77" required></div>
+          <div class="field"><label>Patient ID, email or invite code</label>
+            <input type="text" name="patient_ref" class="inp"
+                   placeholder="e.g. 4F2A9C1B77, them@example.com or CN-1A2B3C4D" required></div>
           <div class="field"><label>Your relationship to them</label>
             <input type="text" name="relationship" class="inp" placeholder="e.g. Daughter"></div>
           <button type="submit" class="btn btn-teal block">Send request</button>
         </form>
       </div></div>
 
-      {% else %}
+      {% elif device_blocked %}
+      {# ---------- Linked, but this device is not approved ---------- #}
+      <div class="page-head">
+        <span class="chip-role">Caregiver</span>
+        <h1>Waiting for device approval</h1>
+        <div class="page-sub">You're linked to {{ patient.display_name }}, but this device is new to us.</div>
+      </div>
 
+      <div class="callout warn">
+        <svg class="ic"><use href="#i-shield-alert"/></svg>
+        <div class="c-body"><strong>{{ device.label|default:"This device" }} is waiting on approval.</strong>
+          {% if device.status == 'REJECTED' %}
+          {{ patient.display_name }} blocked this device. Ask them to approve it if this really is you.
+          {% else %}
+          We've asked {{ patient.display_name }} to confirm it's you. Their data stays hidden until they do.
+          {% endif %}</div>
+      </div>
+
+      {% else %}
+      {# ---------- Linked patient overview ---------- #}
       <div class="page-head">
         <span class="chip-role">Caregiver</span>
         <h1>Monitoring: {{ patient.display_name }}</h1>
-        <div class="page-sub">Linked since {{ link.decided_at|default:link.requested_at|date:"j M Y" }} &middot; read-only view.</div>
+        <div class="page-sub">Linked since {{ link.decided_at|default:link.requested_at|date:"j M Y" }}
+          {% if link.relationship %}&middot; {{ link.relationship }}{% endif %} &middot; read-only view.</div>
       </div>
 
       <div class="callout muted">
         <svg class="ic"><use href="#i-shield-alert"/></svg>
-        <div class="c-body">You see only what {{ patient.first_name|default:patient.display_name }} has consented to share. Mental-health entries are never shown here.</div>
+        <div class="c-body">You see only what {{ patient.first_name|default:patient.display_name }} has consented to share.
+          Mental-health entries are never shown here.
+          {% if withheld %}<br><span style="font-size:12.5px;">Not shared with you: {{ withheld|join:", " }}.</span>{% endif %}</div>
       </div>
 
-      {% for a in alerts %}
-      <div class="callout {% if a.level == 'CRITICAL' %}danger{% else %}warn{% endif %}">
-        <svg class="ic"><use href="#i-shield-alert"/></svg>
-        <div class="c-body"><strong>{{ a.text }}</strong><br><span style="font-size:12.5px;">{{ a.evidence }}</span></div>
+      {# ---------- Needs Attention ---------- #}
+      {% if needs_attention %}
+      <div class="panel" style="margin-bottom:22px;"><div class="p-body tall">
+        <h3 class="p-h"><svg class="ic"><use href="#i-shield-alert"/></svg> Needs attention
+          <span class="pill warn">{{ needs_attention|length }}</span></h3>
+        {% for item in needs_attention %}
+        <div class="callout {% if item.level == 'danger' %}danger{% else %}warn{% endif %}"
+             style="margin-bottom:10px;">
+          <svg class="ic"><use href="#i-bell"/></svg>
+          <div class="c-body"><strong>{{ item.title }}</strong>
+            {% if item.detail %}<br><span style="font-size:12.5px;">{{ item.detail }}</span>{% endif %}</div>
+        </div>
+        {% endfor %}
+      </div></div>
+      {% else %}
+      <div class="callout info">
+        <svg class="ic"><use href="#i-check"/></svg>
+        <div class="c-body">Nothing needs your attention right now.</div>
       </div>
-      {% endfor %}
+      {% endif %}
 
+      {# ---------- Health status ---------- #}
       {% if can_see_vitals %}
       <div class="grid stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:22px;">
         {% if latest_vital %}
@@ -97,16 +136,12 @@
           </tbody>
         </table>
       </div></div>
-      {% else %}
-      <div class="callout warn">
-        <svg class="ic"><use href="#i-shield-alert"/></svg>
-        <div class="c-body">{{ patient.display_name }} has not shared vitals with you. Ask them to grant access from their Share Records page.</div>
-      </div>
       {% endif %}
 
+      {# ---------- Medication status ---------- #}
       {% if can_see_medications %}
-      <div class="panel"><div class="p-body tall">
-        <h3 class="p-h"><svg class="ic"><use href="#i-pill"/></svg> Medicines
+      <div class="panel" style="margin-bottom:22px;"><div class="p-body tall">
+        <h3 class="p-h"><svg class="ic"><use href="#i-pill"/></svg> Medication status
           {% if adherence is not None %}<span class="pill {% if adherence >= 80 %}ok{% else %}warn{% endif %}">{{ adherence }}% adherence</span>{% endif %}</h3>
         {% if missed_doses %}
         <div class="callout warn" style="margin-bottom:12px;"><svg class="ic"><use href="#i-bell"/></svg>
@@ -123,6 +158,85 @@
         {% endfor %}
       </div></div>
       {% endif %}
+
+      <div class="grid g-7-5">
+        <div>
+          {# ---------- Upcoming appointments ---------- #}
+          {% if can_see_appointments %}
+          <div class="panel" style="margin-bottom:22px;"><div class="p-body tall">
+            <h3 class="p-h"><svg class="ic"><use href="#i-calendar-days"/></svg> Upcoming appointments</h3>
+            {% for a in appointments %}
+            <div class="lrow">
+              <span class="ri tint-purple" style="width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:0 0 38px;">
+                <svg class="ic"><use href="#i-calendar-check"/></svg></span>
+              <div class="grow">
+                <div class="t">{{ a.provider.display_name }}</div>
+                <div class="s">{{ a.scheduled_for|date:"j M Y, g:i A" }} &middot; {{ a.get_status_display }}
+                  {% if a.reason %}&middot; {{ a.reason }}{% endif %}</div>
+              </div>
+            </div>
+            {% empty %}
+            <p style="color:var(--muted);font-size:13.5px;">Nothing scheduled.</p>
+            {% endfor %}
+          </div></div>
+          {% endif %}
+
+          {# ---------- Lifestyle ---------- #}
+          {% if can_see_lifestyle %}
+          <div class="panel"><div class="p-body tall">
+            <h3 class="p-h"><svg class="ic"><use href="#i-leaf"/></svg> Lifestyle today</h3>
+            {% if lifestyle_today %}
+            <div class="kv"><span class="k">Sleep</span><span class="v">{{ lifestyle_today.sleep_hours|default:"&mdash;" }} h</span></div>
+            <div class="kv"><span class="k">Water</span><span class="v">{{ lifestyle_today.water_litres|default:"&mdash;" }} L</span></div>
+            <div class="kv"><span class="k">Steps</span><span class="v">{{ lifestyle_today.steps|default:"&mdash;" }}</span></div>
+            {% if lifestyle_today.activity_note %}
+            <div class="kv"><span class="k">Note</span><span class="v">{{ lifestyle_today.activity_note }}</span></div>
+            {% endif %}
+            {% else %}
+            <p style="color:var(--muted);font-size:13.5px;">Nothing logged today.</p>
+            {% endif %}
+          </div></div>
+          {% endif %}
+        </div>
+
+        <div>
+          {# ---------- Notifications ---------- #}
+          <div class="panel" style="margin-bottom:22px;"><div class="p-body tall">
+            <h3 class="p-h"><svg class="ic"><use href="#i-bell"/></svg> Notifications
+              {% if unread_count %}<span class="pill warn">{{ unread_count }} new</span>{% endif %}</h3>
+            {% for n in notifications %}
+            <div class="lrow">
+              <div class="grow">
+                <div class="t">{{ n.title }}</div>
+                <div class="s">{{ n.body }}{% if n.body %} &middot; {% endif %}{{ n.created_at|date:"j M, g:i A" }}</div>
+              </div>
+            </div>
+            {% empty %}
+            <p style="color:var(--muted);font-size:13.5px;">Nothing new.</p>
+            {% endfor %}
+            <a class="btn btn-ghost block" href="{% url 'notifications' %}" style="margin-top:10px;">See all</a>
+          </div></div>
+
+          {# ---------- Emergency contacts ---------- #}
+          {% if can_see_emergency %}
+          <div class="panel"><div class="p-body tall">
+            <h3 class="p-h"><svg class="ic"><use href="#i-shield-alert"/></svg> Emergency contacts</h3>
+            {% if patient.emergency_contact or patient.emergency_contact_name %}
+            <div class="kv"><span class="k">{{ patient.emergency_contact_name|default:"Contact" }}
+              {% if patient.emergency_contact_relation %}({{ patient.emergency_contact_relation }}){% endif %}</span>
+              <span class="v">{{ patient.emergency_contact|default:"&mdash;" }}</span></div>
+            {% else %}
+            <p style="color:var(--muted);font-size:13.5px;">{{ patient.first_name|default:patient.display_name }} hasn't added one yet.</p>
+            {% endif %}
+            <div class="kv"><span class="k">{{ patient.display_name }}</span>
+              <span class="v">{{ patient.phone_number|default:"&mdash;" }}</span></div>
+            {% if patient.allergies %}
+            <div class="kv"><span class="k">Allergies</span><span class="v">{{ patient.allergies }}</span></div>
+            {% endif %}
+          </div></div>
+          {% endif %}
+        </div>
+      </div>
 
       {% endif %}
 

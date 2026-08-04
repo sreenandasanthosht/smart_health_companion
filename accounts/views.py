@@ -17,7 +17,11 @@ from django.core.exceptions import ValidationError
 from django.shortcuts import redirect, render
 
 from accounts.forms import LoginForm, PUBLIC_ROLE_CHOICES, RegisterForm
-from accounts.models import CaregiverLink, User
+from accounts.devices import register_device, set_device_cookie
+from accounts.linking import create_link_request, resolve_patient
+from accounts.models import (
+    CaregiverInvite, CaregiverLink, Notification, TrustedDevice, User,
+)
 from adminpanel.models import AuditLog
 
 ONBOARDING_CONTENT = {
@@ -98,15 +102,14 @@ def register_view(request):
                 )
 
                 if role == User.Role.CAREGIVER:
-                    patient_id = form.cleaned_data['caregiver_patient_id'].strip().upper()
-                    patient = User.objects.filter(unique_id=patient_id, role=User.Role.PATIENT).first()
+                    patient, invite, error = resolve_patient(form.cleaned_data['caregiver_patient_ref'])
                     if patient:
-                        CaregiverLink.objects.create(patient=patient, caregiver=user)
+                        create_link_request(patient, user, invite=invite)
                         messages.info(request, f'Request sent to {patient.display_name}. They need to approve it.')
                     else:
                         messages.warning(
                             request,
-                            "We couldn't find a patient with that ID -- you can send the request again from your dashboard.")
+                            f'{error} You can send the request again from your dashboard.')
 
                 if role == User.Role.PROVIDER:
                     from providers.models import ProviderProfile
@@ -128,7 +131,9 @@ def register_view(request):
                 return redirect('onboarding', role=role.lower())
     else:
         form = RegisterForm()
-    return render(request, 'accounts/register.html', {'form': form, 'roles': PUBLIC_ROLE_CHOICES})
+    return render(request, 'accounts/register.html', {
+        'form': form, 'roles': form.fields['role'].choices,
+    })
 
 
 def _username_for_login(typed_email):
@@ -175,7 +180,20 @@ def login_view(request):
                 form.add_error(None, 'This account has been suspended. Please contact support.')
             else:
                 login(request, user)
-                return redirect(ROLE_DASHBOARD_URL.get(user.role, 'home'))
+                response = redirect(ROLE_DASHBOARD_URL.get(user.role, 'home'))
+
+                # Caregivers get the extra new-device check; nobody else
+                # is reading someone else's data, so nobody else needs it.
+                if user.role == User.Role.CAREGIVER:
+                    device, new_token = register_device(request, user)
+                    if device.status == TrustedDevice.Status.PENDING:
+                        messages.warning(
+                            request,
+                            "We haven't seen this device before, so we've asked the patient to "
+                            'approve it. You can sign in, but their data stays hidden until they do.')
+                    return set_device_cookie(response, new_token)
+
+                return response
     else:
         form = LoginForm()
     return render(request, 'accounts/login.html', {'form': form})
@@ -232,6 +250,10 @@ def profile_view(request):
         user.sex = request.POST.get('sex', '').strip()
         user.address = request.POST.get('address', '').strip()
         user.emergency_contact = request.POST.get('emergency_contact', '').strip()
+        user.emergency_contact_name = request.POST.get('emergency_contact_name', '').strip()
+        user.emergency_contact_relation = request.POST.get('emergency_contact_relation', '').strip()
+        user.allergies = request.POST.get('allergies', '').strip()
+        user.medical_conditions = request.POST.get('medical_conditions', '').strip()
 
         dob = request.POST.get('date_of_birth', '').strip()
         height = request.POST.get('height_cm', '').strip()

@@ -11,8 +11,20 @@
       <a class="nav-item {% if active == 'verification' %}active{% endif %}" href="{% url 'admin_verification' %}"><svg class="ic"><use href="#i-shield-alert"/></svg> Provider Verification</a>
       <a class="nav-item {% if active == 'users' %}active{% endif %}" href="{% url 'admin_users' %}"><svg class="ic"><use href="#i-users"/></svg> Users</a>
       <a class="nav-item {% if active == 'providers' %}active{% endif %}" href="{% url 'admin_providers' %}"><svg class="ic"><use href="#i-stethoscope"/></svg> Providers</a>
+      <a class="nav-item {% if active == 'caregivers' %}active{% endif %}" href="{% url 'admin_caregivers' %}"><svg class="ic"><use href="#i-users"/></svg> Caregivers</a>
       <a class="nav-item {% if active == 'nursing' %}active{% endif %}" href="{% url 'admin_nursing' %}"><svg class="ic"><use href="#i-heart"/></svg> Nursing</a>
+      <a class="nav-item {% if active == 'complaints' %}active{% endif %}" href="{% url 'admin_complaints' %}"><svg class="ic"><use href="#i-message"/></svg> Reports &amp; Complaints
+        {% if stat_open_complaints %}<span class="pill warn">{{ stat_open_complaints }}</span>{% endif %}</a>
+      <a class="nav-item {% if active == 'events' %}active{% endif %}" href="{% url 'admin_events' %}"><svg class="ic"><use href="#i-calendar-days"/></svg> Event Approval
+        {% if stat_pending_events %}<span class="pill warn">{{ stat_pending_events }}</span>{% endif %}</a>
+      <a class="nav-item {% if active == 'announcements' %}active{% endif %}" href="{% url 'admin_announcements' %}"><svg class="ic"><use href="#i-bell"/></svg> Announcements</a>
+      <a class="nav-item {% if active == 'analytics' %}active{% endif %}" href="{% url 'admin_analytics' %}"><svg class="ic"><use href="#i-activity"/></svg> Platform Analytics</a>
       <a class="nav-item {% if active == 'audit' %}active{% endif %}" href="{% url 'admin_audit_log' %}"><svg class="ic"><use href="#i-clock"/></svg> Audit Log</a>
+      {% if is_super_admin %}
+      <div class="nav-sep"></div>
+      <a class="nav-item {% if active == 'admins' %}active{% endif %}" href="{% url 'admin_accounts' %}"><svg class="ic"><use href="#i-shield-alert"/></svg> Admin Management</a>
+      <a class="nav-item {% if active == 'settings' %}active{% endif %}" href="{% url 'admin_settings' %}"><svg class="ic"><use href="#i-target"/></svg> Settings</a>
+      {% endif %}
       <div class="nav-sep"></div>
       <a class="nav-item emergency" href="#"><svg class="ic"><use href="#i-shield-alert"/></svg>
         <span>Emergency<span class="sub">Quick help in an emergency</span></span></a>

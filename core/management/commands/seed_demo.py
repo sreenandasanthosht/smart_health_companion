@@ -20,14 +20,17 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from accounts.models import CaregiverLink
-from adminpanel.models import AuditLog
+from accounts.models import (
+    CaregiverInvite, CaregiverLink, Notification, TrustedDevice,
+)
+from adminpanel.models import Announcement, AuditLog, Complaint, PlatformSettings
 from health import analytics
 from health.models import (
-    ConsentGrant, LifestyleLog, Medication, MedicationDose, MoodLog, VitalRecord,
+    ConsentGrant, HealthDocument, LifestyleLog, Medication, MedicationDose,
+    MoodLog, VitalRecord,
 )
 from nursing.models import NurseAssignment, NursingVisit
-from providers.models import Appointment, ProviderProfile
+from providers.models import Appointment, HealthEvent, ProviderProfile
 
 User = get_user_model()
 
@@ -43,6 +46,7 @@ PEOPLE = [
     ('prakashlab@example.com', 'Prakash', 'Diagnostics', User.Role.PROVIDER, '+91 98450 22114'),
     ('nurse.priya@example.com', 'Priya', 'Suresh', User.Role.NURSE, '+91 98450 44226'),
     ('admin@example.com', 'CareNest', 'Admin', User.Role.ADMIN, '+91 98450 66338'),
+    ('staffadmin@example.com', 'Sunil', 'Kamath', User.Role.ADMIN, '+91 98450 66339'),
 ]
 
 PROVIDER_SETUP = {
@@ -96,7 +100,13 @@ class Command(BaseCommand):
                 user.emergency_contact = '+91 98450 00000'
                 if role == User.Role.ADMIN:
                     user.is_staff = True
-                    user.is_superuser = True
+                    # Only the first admin is the Super Admin created
+                    # "during system setup", per the Admin Module proposal.
+                    # The second is a standard Admin, so the demo shows
+                    # what the tier actually restricts.
+                    if email == 'admin@example.com':
+                        user.is_superuser = True
+                        user.is_super_admin = True
                 user.save()
             users[email] = user
         self.stdout.write(self.style.SUCCESS(f'{len(users)} accounts ready.'))
@@ -205,10 +215,44 @@ class Command(BaseCommand):
                           decided_at=timezone.now()),
         )
         if not ConsentGrant.objects.filter(patient=latha, recipient=meera, revoked_at__isnull=True).exists():
+            # The everyday categories, matching what approving a link grants.
+            # The restricted ones stay off so the demo shows the distinction.
             ConsentGrant.objects.create(
-                patient=latha, recipient=meera, scope_vitals=True, scope_medications=True,
+                patient=latha, recipient=meera,
+                scope_vitals=True, scope_medications=True, scope_appointments=True,
+                scope_alerts=True, scope_emergency=True, scope_lifestyle=True,
                 action_context='Caregiver monitoring')
             AuditLog.record(latha, 'Approved a caregiver link', meera.display_name, AuditLog.Tag.OK)
+
+        # A device Meera signed in from that Latha hasn't confirmed yet, so
+        # the new-device approval queue isn't empty in the demo.
+        if not TrustedDevice.objects.filter(user=meera).exists():
+            TrustedDevice.objects.create(
+                user=meera, patient=latha, token=TrustedDevice.new_token(),
+                label='Chrome on Android', status=TrustedDevice.Status.PENDING)
+            Notification.send(
+                latha, title=f'New sign-in by {meera.display_name}',
+                body='Chrome on Android tried to open your caregiver view.',
+                kind=Notification.Kind.DEVICE_APPROVAL,
+                level=Notification.Level.WARNING,
+                action_url_name='health_caregiver_requests')
+
+        # An unused invite code the patient can hand out.
+        if not CaregiverInvite.objects.filter(patient=latha).exists():
+            CaregiverInvite.objects.create(
+                patient=latha, label='For my son Rahul',
+                expires_at=timezone.now() + datetime.timedelta(days=7))
+
+        # A couple of documents, to show the restricted categories have
+        # something behind them.
+        if not HealthDocument.objects.filter(patient=latha).exists():
+            HealthDocument.objects.create(
+                patient=latha, title='Lipid profile', kind=HealthDocument.Kind.LAB,
+                note='Fasting sample', issued_on=timezone.localdate() - datetime.timedelta(days=21))
+            HealthDocument.objects.create(
+                patient=latha, title='Cardiology consult summary',
+                kind=HealthDocument.Kind.REPORT,
+                issued_on=timezone.localdate() - datetime.timedelta(days=40))
 
         # A time-boxed share with a provider, plus one already revoked.
         nair = users['dr.nair@example.com']
@@ -276,6 +320,77 @@ class Command(BaseCommand):
                 notes='Routine check. Patient comfortable, medicines taken as prescribed.')
         self.stdout.write(self.style.SUCCESS('Nursing assignment and visits created.'))
 
+        # --- Health camps & wellness events ------------------------------
+        # One of each status, so the approval queue and the public listing
+        # both have something to show.
+        nair_profile = ProviderProfile.objects.get(user=users['dr.nair@example.com'])
+        lab_profile = ProviderProfile.objects.get(user=users['prakashlab@example.com'])
+        if not HealthEvent.objects.exists():
+            HealthEvent.objects.create(
+                provider=nair_profile, title='Free blood pressure screening camp',
+                kind=HealthEvent.Kind.SCREENING,
+                description='Walk-in BP and blood sugar checks. No appointment needed.',
+                venue='Community Hall, Jayanagar, Bengaluru',
+                starts_at=timezone.now() + datetime.timedelta(days=9),
+                capacity=120, is_free=True,
+                status=HealthEvent.Status.APPROVED,
+                reviewed_by=users['admin@example.com'], reviewed_at=timezone.now())
+            HealthEvent.objects.create(
+                provider=lab_profile, title='Diabetes awareness workshop',
+                kind=HealthEvent.Kind.AWARENESS,
+                description='Diet, exercise and monitoring for newly diagnosed patients.',
+                venue='Prakash Diagnostics, Indiranagar',
+                starts_at=timezone.now() + datetime.timedelta(days=16),
+                capacity=40, is_free=True)  # left PENDING for the admin queue
+            HealthEvent.objects.create(
+                provider=nair_profile, title='Weekend wellness retreat',
+                kind=HealthEvent.Kind.WELLNESS,
+                description='Two-day residential programme.',
+                venue='Nandi Hills',
+                starts_at=timezone.now() + datetime.timedelta(days=30),
+                is_free=False,
+                status=HealthEvent.Status.REJECTED,
+                review_note='Residential events are outside platform scope for now.',
+                reviewed_by=users['admin@example.com'], reviewed_at=timezone.now())
+
+        # --- Complaints ---------------------------------------------------
+        if not Complaint.objects.exists():
+            Complaint.objects.create(
+                reporter=latha, against_user=users['dr.mehta@example.com'],
+                category=Complaint.Category.PROVIDER,
+                subject='Appointment started 40 minutes late',
+                description='Booked for 10:00, was seen at 10:40 with no explanation.')
+            Complaint.objects.create(
+                reporter=ramesh, category=Complaint.Category.TECHNICAL,
+                subject='Vitals chart not loading on mobile',
+                description='The trend line is blank on my phone but fine on a laptop.',
+                status=Complaint.Status.IN_REVIEW, handled_by=users['admin@example.com'])
+            Complaint.objects.create(
+                reporter=latha, category=Complaint.Category.PRIVACY,
+                subject='Wanted to check who can see my records',
+                description='Asked for confirmation that my mood log is not shared.',
+                status=Complaint.Status.RESOLVED,
+                resolution_note='Confirmed: mental-health entries are never shareable.',
+                handled_by=users['admin@example.com'], resolved_at=timezone.now())
+
+        # --- Announcements ------------------------------------------------
+        if not Announcement.objects.exists():
+            published = Announcement.objects.create(
+                author=users['admin@example.com'],
+                title='Scheduled maintenance this Sunday',
+                body='CareNest will be unavailable from 02:00 to 04:00 IST on Sunday for '
+                     'planned maintenance. Your data is unaffected.',
+                audience=Announcement.Audience.ALL)
+            published.publish()
+            Announcement.objects.create(
+                author=users['admin@example.com'],
+                title='New verification documents required',
+                body='From next month, providers must upload a current address proof.',
+                audience=Announcement.Audience.PROVIDERS)  # left as a draft
+
+        PlatformSettings.load()
+        self.stdout.write(self.style.SUCCESS('Events, complaints and announcements created.'))
+
         # --- Generate insights so dashboards are populated --------------
         for patient in (latha, ramesh):
             analytics.generate_insights(patient)
@@ -284,6 +399,10 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('Demo data ready. Log in with any of these:'))
         self.stdout.write('')
         for email, first, last, role, _phone in PEOPLE:
-            self.stdout.write(f"  {User.Role(role).label:<10} {email:<28} password: {PASSWORD}")
+            label = User.Role(role).label
+            if role == User.Role.ADMIN and email == 'admin@example.com':
+                label = 'Super Admin'
+            self.stdout.write(f"  {label:<11} {email:<28} password: {PASSWORD}")
         self.stdout.write('')
-        self.stdout.write('The Admin account is also a Django superuser, so it opens /admin/ too.')
+        self.stdout.write('admin@example.com is the Super Admin (and a Django superuser, so /admin/ works).')
+        self.stdout.write('staffadmin@example.com is a standard Admin -- no Admin Management or Settings.')

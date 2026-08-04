@@ -1,0 +1,62 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Caregiver Management &middot; CareNest{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar_admin.html' with active='caregivers' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Admin</span>
+        <h1>Caregiver Management</h1>
+        <div class="page-sub">{{ approved }} approved &middot; {{ pending }} awaiting the patient's decision.</div>
+      </div>
+
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
+
+      <div class="callout muted">
+        <svg class="ic"><use href="#i-shield-alert"/></svg>
+        <div class="c-body">You can revoke a link, but not approve one. Approval is the patient's decision alone &mdash;
+          granting access on their behalf would defeat the point of asking them.</div>
+      </div>
+
+      <div class="panel"><div class="p-body tall">
+        <table class="dtable">
+          <thead><tr><th>Caregiver</th><th>Patient</th><th>Status</th><th>Can see</th><th></th></tr></thead>
+          <tbody>
+            {% for r in rows %}
+            <tr>
+              <td>
+                <div class="t">{{ r.link.caregiver.display_name }}</div>
+                <div class="s">{{ r.link.caregiver.email }}{% if r.link.relationship %} &middot; {{ r.link.relationship }}{% endif %}</div>
+              </td>
+              <td>
+                <div class="t">{{ r.link.patient.display_name }}</div>
+                <div class="s">{{ r.link.patient.unique_id }}</div>
+              </td>
+              <td><span class="pill {% if r.link.status == 'APPROVED' %}ok{% elif r.link.status == 'PENDING' %}warn{% else %}muted{% endif %}">{{ r.link.get_status_display }}</span></td>
+              <td>
+                <div class="s">{{ r.scopes }}</div>
+                {% if r.restricted %}<div class="s" style="color:#b45309;">Restricted: {{ r.restricted }}</div>{% endif %}
+              </td>
+              <td>
+                {% if r.link.status == 'APPROVED' %}
+                <form method="post">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="revoke">
+                  <input type="hidden" name="link_id" value="{{ r.link.id }}">
+                  <button type="submit" class="btn btn-danger-ghost">Revoke</button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" style="color:var(--muted);">No caregiver links yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div></div>
+
+{% endblock %}

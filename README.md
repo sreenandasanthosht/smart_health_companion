@@ -16,16 +16,25 @@ keep a private mental-health journal. The dashboard computes a health score,
 draws real trend lines from their own readings, and lists generated observations
 alongside the evidence for each one.
 
-Caregivers request access using a patient's CareNest ID and see nothing at all
-until that patient approves them — and then only the categories the patient
-consented to. Providers register, submit verification documents, and appear in
+Caregivers request access using a patient's CareNest ID, their email address or
+a single-use invite code, and see nothing at all until that patient approves
+them — and then only the categories the patient consented to. Approval hands
+over the everyday ones (vitals, medicines, appointments, alerts, emergency
+contacts, lifestyle); records, documents, reports and the AI summary stay hidden
+until the patient shares them deliberately. A caregiver signing in from a device
+the patient hasn't confirmed is held until they do. Providers register, submit
+verification documents, and appear in
 the searchable directory only once an administrator approves them; patients book
 appointments with them, and providers accept, decline, annotate and complete
-those requests. Nurses are assigned to patients by an administrator, log home
-visits with vitals that are provenance-tagged as nurse-recorded, and can raise
-escalations for a provider's attention. Administrators work a live verification
-queue, manage and suspend accounts, assign nurses, and read an append-only audit
-log of every consequential action.
+those requests. Providers also submit health camps and wellness programmes,
+which stay invisible to patients until an administrator approves them. Nurses
+are assigned to patients by an administrator, log home visits with vitals that
+are provenance-tagged as nurse-recorded, and can raise escalations for a
+provider's attention. Administrators work a live verification queue, approve
+events, review complaints, publish announcements, manage and suspend accounts,
+watch platform analytics, and read an append-only audit log of every
+consequential action — with a Super Admin tier above them that alone can create
+admin accounts and change system settings.
 
 ## Roles
 
@@ -35,10 +44,13 @@ log of every consequential action.
 | Caregiver | Self-registers, then patient approves the link | `/health/caregiver-dashboard/` |
 | Provider | Self-registers, then admin verifies | `/providers/dashboard/` |
 | Nurse | Assigned by an administrator | `/nursing/dashboard/` |
-| Admin | Created with `createsuperuser` or by an admin | `/admin-panel/dashboard/` |
+| Admin | Created by a Super Admin only | `/admin-panel/dashboard/` |
+| Super Admin | The first one at setup; after that, by another Super Admin | `/admin-panel/dashboard/` |
 
 Nurse and Admin are deliberately **not** self-registerable — the registration
-form rejects those values outright.
+form rejects those values outright. Super Admin is a tier within the Admin role
+rather than a separate role, and is the only tier that can create admin accounts
+or change system settings.
 
 ## Project layout
 
@@ -119,11 +131,18 @@ access control, and that every page returns HTTP 200.
 
 ## Design decisions
 
-Two design documents drove the data model and are worth reading alongside the code:
+Four design documents drove the data model and are worth reading alongside the code:
 
 * `CONSENT_FRAMEWORK_DESIGN.md` — implemented by `health.models.ConsentGrant` and
-  the `has_consent()` check. Mental-health data is a hard exclusion: there is no
-  scope value that can grant access to it.
+  the `has_consent()` check. Categories split into a standard tier and a
+  restricted tier; mental-health data is in neither, and is a hard exclusion —
+  there is no scope value that can grant access to it.
+* `CAREGIVER_MODULE_DESIGN.md` — implemented across `accounts` and `health`. A
+  caregiver's request passes three independent gates (link approved, device
+  approved, category consented), each enforced in a different place.
+* `ADMIN_MODULE_DESIGN.md` — implemented by the `adminpanel` app. Super Admin is a
+  tier within the Admin role rather than a separate role, and `HealthEvent.public()`
+  is the single gate deciding what patients can see.
 * `NURSING_ROLE_DESIGN.md` — implemented by the `nursing` app. Nurse-recorded
   vitals go into the same `VitalRecord` table as self-recorded ones but carry a
   `source` and `entered_by`, which answers the open question that document raised.

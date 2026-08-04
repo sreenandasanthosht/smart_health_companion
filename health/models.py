@@ -128,6 +128,43 @@ class MoodLog(models.Model):
         return f"{self.patient} -- {self.date} ({self.mood})"
 
 
+class HealthDocument(models.Model):
+    """
+    A document the patient holds against their own record -- a lab result,
+    a discharge summary, a scan.
+
+    Both specs treat these as sensitive: the onboarding flow lists "health
+    documents" among the things a patient adds *later*, at their own pace,
+    and the caregiver proposal names Health Documents and Medical Reports
+    as restricted items that stay hidden without an explicit grant. They
+    are therefore covered only by the DOCUMENTS / REPORTS scopes, never by
+    the baseline consent an approved caregiver link creates.
+    """
+    class Kind(models.TextChoices):
+        REPORT = 'REPORT', 'Medical report'
+        LAB = 'LAB', 'Lab result'
+        PRESCRIPTION = 'PRESCRIPTION', 'Prescription'
+        SCAN = 'SCAN', 'Scan / imaging'
+        OTHER = 'OTHER', 'Other'
+
+    patient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='documents')
+    title = models.CharField(max_length=150)
+    kind = models.CharField(max_length=12, choices=Kind.choices, default=Kind.OTHER)
+    note = models.CharField(max_length=255, blank=True)
+    issued_on = models.DateField(null=True, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-uploaded_at']
+
+    def is_report(self):
+        """Reports and labs sit behind the REPORTS scope; the rest behind DOCUMENTS."""
+        return self.kind in {self.Kind.REPORT, self.Kind.LAB}
+
+    def __str__(self):
+        return f"{self.title} ({self.patient})"
+
+
 class ConsentGrant(models.Model):
     """
     The `Consent` entity from CONSENT_FRAMEWORK_DESIGN.md section 3.
@@ -138,18 +175,45 @@ class ConsentGrant(models.Model):
     the audit trail shows both the grant and the withdrawal.
     """
     class Scope(models.TextChoices):
-        VITALS = 'VITALS', 'Vitals'
-        MEDICATIONS = 'MEDICATIONS', 'Medications'
+        # --- Standard categories a patient can share ---
+        VITALS = 'VITALS', 'Vital signs'
+        MEDICATIONS = 'MEDICATIONS', 'Medication status'
+        APPOINTMENTS = 'APPOINTMENTS', 'Appointments'
+        ALERTS = 'ALERTS', 'Health alerts'
+        EMERGENCY = 'EMERGENCY', 'Emergency contacts'
+        LIFESTYLE = 'LIFESTYLE', 'Lifestyle tracking'
+        # --- Restricted categories: hidden unless explicitly granted ---
         RECORDS = 'RECORDS', 'Lab / prescription records'
-        LIFESTYLE = 'LIFESTYLE', 'Lifestyle logs'
+        DOCUMENTS = 'DOCUMENTS', 'Health documents'
+        REPORTS = 'REPORTS', 'Medical reports'
+        AI_SUMMARY = 'AI_SUMMARY', 'AI health summary'
         # NOTE: there is intentionally no MENTAL_HEALTH scope.
+
+    # The Caregiver Module proposal splits permissions into two tiers: the
+    # everyday ones a patient is likely to hand over, and the sensitive
+    # ones that "remain hidden unless permission is granted". The UI reads
+    # these two lists so the split is declared once, here.
+    STANDARD_SCOPES = [
+        Scope.VITALS, Scope.MEDICATIONS, Scope.APPOINTMENTS,
+        Scope.ALERTS, Scope.EMERGENCY, Scope.LIFESTYLE,
+    ]
+    RESTRICTED_SCOPES = [
+        Scope.RECORDS, Scope.DOCUMENTS, Scope.REPORTS, Scope.AI_SUMMARY,
+    ]
 
     patient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='consents_given')
     recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='consents_received')
     scope_vitals = models.BooleanField(default=True)
     scope_medications = models.BooleanField(default=True)
-    scope_records = models.BooleanField(default=False)
+    scope_appointments = models.BooleanField(default=False)
+    scope_alerts = models.BooleanField(default=False)
+    scope_emergency = models.BooleanField(default=False)
     scope_lifestyle = models.BooleanField(default=False)
+    # Restricted -- never on by default, including for an approved caregiver.
+    scope_records = models.BooleanField(default=False)
+    scope_documents = models.BooleanField(default=False)
+    scope_reports = models.BooleanField(default=False)
+    scope_ai_summary = models.BooleanField(default=False)
     granted_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(null=True, blank=True)
     revoked_at = models.DateTimeField(null=True, blank=True)
@@ -178,16 +242,25 @@ class ConsentGrant(models.Model):
             self.save(update_fields=['revoked_at'])
 
     def scope_list(self):
-        names = []
-        if self.scope_vitals:
-            names.append('Vitals')
-        if self.scope_medications:
-            names.append('Medications')
-        if self.scope_records:
-            names.append('Records')
-        if self.scope_lifestyle:
-            names.append('Lifestyle')
-        return names
+        """Human-readable names of every category this grant covers."""
+        return [
+            self.Scope(scope).label
+            for scope, field in SCOPE_FIELDS.items()
+            if getattr(self, field, False)
+        ]
+
+    def restricted_scope_list(self):
+        """Only the sensitive categories -- shown separately in the UI."""
+        return [
+            self.Scope(scope).label
+            for scope in self.RESTRICTED_SCOPES
+            if getattr(self, SCOPE_FIELDS[scope], False)
+        ]
+
+    def covers(self, scope):
+        """True if this grant includes `scope` (ignoring expiry/revocation)."""
+        field = SCOPE_FIELDS.get(scope)
+        return bool(field and getattr(self, field, False))
 
     def scope_label(self):
         return ' + '.join(self.scope_list()) or 'Nothing'
@@ -203,6 +276,23 @@ class ConsentGrant(models.Model):
         return f"{self.patient} -> {self.recipient} ({self.scope_label()})"
 
 
+# The single mapping from a Scope value to the boolean column that stores
+# it. Everything else -- the grant form, scope_list(), has_consent() --
+# derives from this, so adding a category means editing one place.
+SCOPE_FIELDS = {
+    ConsentGrant.Scope.VITALS: 'scope_vitals',
+    ConsentGrant.Scope.MEDICATIONS: 'scope_medications',
+    ConsentGrant.Scope.APPOINTMENTS: 'scope_appointments',
+    ConsentGrant.Scope.ALERTS: 'scope_alerts',
+    ConsentGrant.Scope.EMERGENCY: 'scope_emergency',
+    ConsentGrant.Scope.LIFESTYLE: 'scope_lifestyle',
+    ConsentGrant.Scope.RECORDS: 'scope_records',
+    ConsentGrant.Scope.DOCUMENTS: 'scope_documents',
+    ConsentGrant.Scope.REPORTS: 'scope_reports',
+    ConsentGrant.Scope.AI_SUMMARY: 'scope_ai_summary',
+}
+
+
 def has_consent(patient, recipient, scope):
     """
     The enforcement check from CONSENT_FRAMEWORK_DESIGN.md section 5.
@@ -211,18 +301,33 @@ def has_consent(patient, recipient, scope):
     (patient, recipient, scope). Mental health is never covered here --
     there is no scope value that can return True for it.
     """
-    field = {
-        ConsentGrant.Scope.VITALS: 'scope_vitals',
-        ConsentGrant.Scope.MEDICATIONS: 'scope_medications',
-        ConsentGrant.Scope.RECORDS: 'scope_records',
-        ConsentGrant.Scope.LIFESTYLE: 'scope_lifestyle',
-    }.get(scope)
+    field = SCOPE_FIELDS.get(scope)
     if field is None:
         return False
     now = timezone.now()
     return ConsentGrant.objects.filter(
         patient=patient, recipient=recipient, revoked_at__isnull=True, **{field: True},
     ).filter(models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=now)).exists()
+
+
+def consent_matrix(patient, recipient):
+    """
+    Every scope resolved in one pass, as {Scope value: bool}.
+
+    A caregiver dashboard needs to know about eight or nine categories at
+    once; asking has_consent() once per category would be eight queries
+    for what is really one question.
+    """
+    now = timezone.now()
+    grants = ConsentGrant.objects.filter(
+        patient=patient, recipient=recipient, revoked_at__isnull=True,
+    ).filter(models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=now))
+    matrix = {scope: False for scope in SCOPE_FIELDS}
+    for grant in grants:
+        for scope, field in SCOPE_FIELDS.items():
+            if getattr(grant, field, False):
+                matrix[scope] = True
+    return matrix
 
 
 class HealthInsight(models.Model):

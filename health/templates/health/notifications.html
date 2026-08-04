@@ -1,0 +1,38 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Notifications &middot; CareNest{% endblock %}
+{% block sidebar %}
+  {% if user.role == 'CAREGIVER' %}{% include 'partials/_sidebar_caregiver.html' with active='notifications' %}
+  {% elif user.role == 'PROVIDER' %}{% include 'partials/_sidebar_provider.html' with active='notifications' %}
+  {% elif user.role == 'NURSE' %}{% include 'partials/_sidebar_nurse.html' with active='notifications' %}
+  {% elif user.role == 'ADMIN' %}{% include 'partials/_sidebar_admin.html' with active='notifications' %}
+  {% else %}{% include 'partials/_sidebar.html' with active='notifications' %}{% endif %}
+{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <h1>Notifications</h1>
+        <div class="page-sub">Everything CareNest has asked you or told you about, newest first.</div>
+      </div>
+
+      <div class="panel"><div class="p-body tall">
+        {% for n in items %}
+        <div class="lrow">
+          <span class="ri {% if n.level == 'WARNING' %}tint-orange{% elif n.level == 'ACTION' %}tint-purple{% else %}tint-green{% endif %}"
+                style="width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:0 0 38px;">
+            <svg class="ic"><use href="#i-bell"/></svg></span>
+          <div class="grow">
+            <div class="t">{{ n.title }}
+              {% if n.is_unread %}<span class="pill warn">New</span>{% endif %}</div>
+            <div class="s">{{ n.body }}{% if n.body %} &middot; {% endif %}{{ n.created_at|date:"j M Y, g:i A" }}</div>
+          </div>
+          {% if n.action_url_name %}
+          <a class="btn btn-ghost" href="{% url n.action_url_name %}">Open</a>
+          {% endif %}
+        </div>
+        {% empty %}
+        <p style="color:var(--muted);font-size:13.5px;">Nothing here yet.</p>
+        {% endfor %}
+      </div></div>
+
+{% endblock %}

@@ -53,7 +53,7 @@ class RegistrationFlowTests(TestCase):
         self.client.post(reverse('register'), {
             'full_name': 'Care Giver', 'email': 'cg@example.com',
             'phone_number': '+91 1', 'role': 'CAREGIVER',
-            'caregiver_patient_id': patient.unique_id,
+            'caregiver_patient_ref': patient.unique_id,
             'password': PW, 'confirm_password': PW,
         })
         link = CaregiverLink.objects.get(caregiver__email='cg@example.com')
