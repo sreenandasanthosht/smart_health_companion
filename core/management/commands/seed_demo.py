@@ -51,11 +51,11 @@ PEOPLE = [
 
 PROVIDER_SETUP = {
     'dr.nair@example.com': dict(
-        provider_type=ProviderProfile.ProviderType.DOCTOR, specialty='General Physician',
+        provider_type=ProviderProfile.ProviderType.CLINIC, specialty='General Physician',
         years_experience=9, clinic_name='City Care Clinic', address='Indiranagar, Bengaluru',
         registration_number='KMC-2016-44821', verified=True),
     'dr.mehta@example.com': dict(
-        provider_type=ProviderProfile.ProviderType.DOCTOR, specialty='Cardiologist',
+        provider_type=ProviderProfile.ProviderType.CLINIC, specialty='Cardiologist',
         years_experience=14, clinic_name='HeartFirst Centre', address='Koramangala, Bengaluru',
         registration_number='KMC-2011-77310', verified=True),
     'prakashlab@example.com': dict(

@@ -64,7 +64,7 @@ class RegistrationFlowTests(TestCase):
         self.client.post(reverse('register'), {
             'full_name': 'Doc Tor', 'email': 'doc@example.com',
             'phone_number': '+91 2', 'role': 'PROVIDER',
-            'provider_type': 'DOCTOR',
+            'provider_type': 'CLINIC',
             'password': PW, 'confirm_password': PW,
         })
         profile = ProviderProfile.objects.get(user__email='doc@example.com')
@@ -238,7 +238,7 @@ class ProviderFlowTests(TestCase):
         self.patient = make('pp@example.com', User.Role.PATIENT)
         self.provider = make('pv@example.com', User.Role.PROVIDER)
         self.profile = ProviderProfile.objects.create(
-            user=self.provider, provider_type=ProviderProfile.ProviderType.DOCTOR,
+            user=self.provider, provider_type=ProviderProfile.ProviderType.CLINIC,
             specialty='General Physician', clinic_name='Test Clinic')
         self.admin = make('ad@example.com', User.Role.ADMIN)
 

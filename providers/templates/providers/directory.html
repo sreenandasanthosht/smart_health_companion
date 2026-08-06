@@ -16,6 +16,12 @@
             <svg class="ic"><use href="#i-search"/></svg>
             <input name="q" value="{{ query }}" placeholder="Search by name or specialty...">
           </div>
+          <select name="group" class="inp" style="max-width:220px;">
+            <option value="">All services</option>
+            {% for value, label in groups %}
+            <option value="{{ value }}" {% if selected_group == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
           <select name="type" class="inp" style="max-width:220px;">
             <option value="">All provider types</option>
             {% for value, label in types %}

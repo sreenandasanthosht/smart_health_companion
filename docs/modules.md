@@ -27,6 +27,17 @@
 | M20 | Availability | `providers` | Weekly availability pattern constraining booking | Planned — Phase 3 |
 | M21 | Monitoring & Alerts | `monitoring` | Rule-driven alerts routed to the assigned nurse and consented providers | Planned — Phase 4 |
 | M22 | Data Science | `datascience` | Non-adherence, health risk, anomaly detection, recommendations, mood analysis | Planned — Phase 5 |
+| M23 | Provider Service Groups | `providers` | Nine provider types grouped into six modules; one `provider_dashboard` URL dispatching to the right screen; shared service / price list | Implemented |
+| M24 | Clinical Care | `providers` | Small clinics and small hospitals: appointments, consultation record (diagnosis, advice, follow-up), hospital departments | Implemented |
+| M25 | Mental Health | `providers` | Psychologists and counsellors: session booking, private notes kept separate from the summary shared with the client | Implemented |
+| M26 | Diagnostics | `providers` | Diagnostic labs: test catalogue, bookings, sample collection, structured result values, report release | Implemented |
+| M27 | Pharmacy | `providers` | Pharmacies: medicine orders from confirmed prescriptions, per-item availability and pricing, fixed fulfilment path | Implemented |
+| M28 | Wellness Programmes | `providers` | Gyms, dieticians and yoga centres: programmes, enrolments, assigned plans, session logging, progress percentage | Implemented |
+| M29 | Home Care | `providers` | Home nurse providers: own nursing team, care requests, staff allocation — replaces admin-side nurse assignment for agency staff | Implemented |
+
+Modules M23–M29 are specified in full in `PROVIDER_MODULES_DESIGN.md`,
+including the grouping rule, the fields each dashboard records, and how each
+module is meant to feed the patient's existing data streams.
 
 ## Modules removed from the original list
 

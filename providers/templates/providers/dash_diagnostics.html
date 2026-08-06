@@ -1,0 +1,199 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Diagnostics &middot; CareNest{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar_provider.html' with active='dashboard' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">{{ group_label }}</span>
+        <h1>{{ profile.display_name }}</h1>
+        <div class="page-sub">{{ profile.get_provider_type_display }}{% if profile.specialty %} &middot; {{ profile.specialty }}{% endif %} &middot; test catalogue, sample collection and reports.</div>
+      </div>
+
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
+
+      <div class="grid stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:22px;">
+        <div class="card stat">
+          <div class="top"><span class="chip orange"><svg class="ic"><use href="#i-calendar-check"/></svg></span><div class="label">New bookings</div></div>
+          <div class="big">{{ requests|length }}</div>
+        </div>
+        <div class="card stat">
+          <div class="top"><span class="chip blue"><svg class="ic"><use href="#i-flask"/></svg></span><div class="label">In progress</div></div>
+          <div class="big">{{ in_progress|length }}</div>
+        </div>
+        <div class="card stat">
+          <div class="top"><span class="chip green"><svg class="ic"><use href="#i-file-text"/></svg></span><div class="label">Reports released</div></div>
+          <div class="big">{{ reported_count }}</div>
+        </div>
+        <div class="card stat">
+          <div class="top"><span class="chip purple"><svg class="ic"><use href="#i-users"/></svg></span><div class="label">Patients served</div></div>
+          <div class="big">{{ patient_count }}</div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:22px;"><div class="p-body">
+        <h3 class="p-h"><svg class="ic"><use href="#i-flask"/></svg> Test catalogue</h3>
+        <table class="dtable">
+          <thead><tr><th>Test</th><th>Category</th><th>Sample</th><th>Preparation</th><th>Price</th><th>Report in</th><th>Home visit</th><th></th></tr></thead>
+          <tbody>
+          {% for t in tests %}
+            <tr>
+              <td><b>{{ t.name }}</b>{% if not t.is_active %} <span class="pill muted">Hidden</span>{% endif %}</td>
+              <td>{{ t.get_category_display }}</td>
+              <td>{{ t.sample_type|default:"&mdash;" }}</td>
+              <td>{{ t.preparation|default:"&mdash;" }}</td>
+              <td>{% if t.price %}&#8377;{{ t.price }}{% else %}&mdash;{% endif %}</td>
+              <td>{% if t.report_hours %}{{ t.report_hours }} hrs{% else %}&mdash;{% endif %}</td>
+              <td>{% if t.home_collection %}<span class="pill ok">Yes</span>{% else %}<span class="pill muted">No</span>{% endif %}</td>
+              <td style="text-align:right;">
+                <form method="post">{% csrf_token %}
+                  <input type="hidden" name="action" value="toggle_test">
+                  <input type="hidden" name="test_id" value="{{ t.id }}">
+                  <button class="btn btn-ghost" style="padding:6px 10px;font-size:12px;">{% if t.is_active %}Hide{% else %}List{% endif %}</button>
+                </form>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="8" style="color:var(--muted);">No tests on your catalogue yet. Add your first one below.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+
+        <form method="post" style="display:grid;grid-template-columns:1.4fr 1fr 1fr 1.4fr .8fr .8fr auto auto;gap:8px;margin-top:14px;align-items:center;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="add_test">
+          <input type="text" name="name" class="inp" placeholder="Test name" required>
+          <select name="category" class="inp">
+            {% for value, label in categories %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+          </select>
+          <input type="text" name="sample_type" class="inp" placeholder="Sample type">
+          <input type="text" name="preparation" class="inp" placeholder="Preparation needed">
+          <input type="number" step="0.01" name="price" class="inp" placeholder="Price">
+          <input type="number" name="report_hours" class="inp" placeholder="Hours">
+          <label class="s" style="display:flex;gap:6px;align-items:center;white-space:nowrap;">
+            <input type="checkbox" name="home_collection"> Home</label>
+          <button class="btn btn-green" style="padding:9px 16px;">Add test</button>
+        </form>
+      </div></div>
+
+      <div class="grid g-2">
+
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-calendar-check"/></svg> New bookings</h3>
+          {% for b in requests %}
+          <div class="lrow" style="flex-direction:column;align-items:stretch;gap:10px;">
+            <div>
+              <div class="t">{{ b.test.name }}</div>
+              <div class="s">{{ b.patient.display_name }} &middot; {{ b.scheduled_for|date:"D, j M - g:i A" }}</div>
+              {% if b.home_collection %}<div class="s">Home collection: {{ b.collection_address|default:"address not given" }}</div>{% endif %}
+            </div>
+            <div style="display:flex;gap:8px;">
+              <form method="post">{% csrf_token %}
+                <input type="hidden" name="booking_id" value="{{ b.id }}">
+                <input type="hidden" name="action" value="confirm">
+                <button class="btn btn-green" style="padding:8px 14px;"><svg class="ic"><use href="#i-check"/></svg> Confirm</button>
+              </form>
+              <form method="post">{% csrf_token %}
+                <input type="hidden" name="booking_id" value="{{ b.id }}">
+                <input type="hidden" name="action" value="cancel">
+                <button class="btn btn-danger-ghost" style="padding:8px 14px;">Cancel</button>
+              </form>
+            </div>
+          </div>
+          {% empty %}
+          <p style="color:var(--muted);font-size:13.5px;">No new bookings.</p>
+          {% endfor %}
+        </div></div>
+
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-activity"/></svg> Samples &amp; results</h3>
+          {% for b in in_progress %}
+          <div class="lrow" style="flex-direction:column;align-items:stretch;gap:10px;">
+            <div>
+              <div class="t">{{ b.test.name }} <span class="pill warn">{{ b.get_status_display }}</span></div>
+              <div class="s">{{ b.patient.display_name }} &middot; {{ b.scheduled_for|date:"j M, g:i A" }}</div>
+            </div>
+
+            {% if b.status == 'CONFIRMED' %}
+            <form method="post">{% csrf_token %}
+              <input type="hidden" name="booking_id" value="{{ b.id }}">
+              <input type="hidden" name="action" value="collected">
+              <button class="btn btn-ghost" style="padding:7px 12px;font-size:12.5px;">Mark sample collected</button>
+            </form>
+            {% endif %}
+
+            {% if b.values.all %}
+            <table class="dtable">
+              <thead><tr><th>Analyte</th><th>Value</th><th>Reference</th><th>Flag</th></tr></thead>
+              <tbody>
+              {% for v in b.values.all %}
+                <tr>
+                  <td>{{ v.analyte }}</td>
+                  <td>{{ v.value }} {{ v.unit }}</td>
+                  <td>{{ v.reference_range|default:"&mdash;" }}</td>
+                  <td><span class="pill {% if v.flag == 'NORMAL' %}ok{% elif v.flag == 'HIGH' %}danger{% else %}warn{% endif %}">{{ v.get_flag_display }}</span></td>
+                </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+            {% endif %}
+
+            <form method="post" style="display:grid;grid-template-columns:1.4fr .8fr .7fr 1fr .9fr auto;gap:6px;align-items:center;">
+              {% csrf_token %}
+              <input type="hidden" name="booking_id" value="{{ b.id }}">
+              <input type="hidden" name="action" value="add_value">
+              <input type="text" name="analyte" class="inp" placeholder="Haemoglobin" required>
+              <input type="text" name="value" class="inp" placeholder="12.4" required>
+              <input type="text" name="unit" class="inp" placeholder="g/dL">
+              <input type="text" name="reference_range" class="inp" placeholder="12.0 - 15.5">
+              <select name="flag" class="inp">
+                {% for value, label in flags %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+              </select>
+              <button class="btn btn-ghost" style="padding:8px 12px;font-size:12.5px;">Add</button>
+            </form>
+
+            <form method="post" style="display:flex;gap:8px;align-items:center;">
+              {% csrf_token %}
+              <input type="hidden" name="booking_id" value="{{ b.id }}">
+              <input type="hidden" name="action" value="release">
+              <input type="text" name="summary" class="inp" style="flex:1;" placeholder="One-line interpretation" value="{{ b.summary }}">
+              <button class="btn btn-green" style="padding:8px 14px;">Release report</button>
+            </form>
+          </div>
+          {% empty %}
+          <p style="color:var(--muted);font-size:13.5px;">Nothing in progress.</p>
+          {% endfor %}
+        </div></div>
+      </div>
+
+      <div class="callout muted" style="margin-top:22px;">
+        <svg class="ic"><use href="#i-shield-alert"/></svg>
+        <div class="c-body">Results are entered as structured values rather than uploaded files. Nothing is
+        stored as a document, and a released value can flow into the patient's own trend charts.</div>
+      </div>
+
+      <div class="panel" style="margin-top:22px;"><div class="p-body">
+        <h3 class="p-h"><svg class="ic"><use href="#i-file-text"/></svg> Released reports</h3>
+        <table class="dtable">
+          <thead><tr><th>Patient</th><th>Test</th><th>Released</th><th>Values</th><th>Summary</th></tr></thead>
+          <tbody>
+          {% for b in reported %}
+            <tr>
+              <td>{{ b.patient.display_name }}</td>
+              <td>{{ b.test.name }}</td>
+              <td>{{ b.reported_at|date:"j M Y" }}</td>
+              <td>{{ b.values.count }}</td>
+              <td>{{ b.summary|default:"&mdash;" }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5" style="color:var(--muted);">No reports released yet.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div></div>
+
+{% endblock %}

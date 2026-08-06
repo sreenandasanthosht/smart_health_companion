@@ -120,7 +120,7 @@ class ProviderVerificationTests(TestCase):
         self.admin = make('admin@example.com', User.Role.ADMIN)
         self.provider_user = make('doc@example.com', User.Role.PROVIDER)
         self.profile = ProviderProfile.objects.create(
-            user=self.provider_user, provider_type=ProviderProfile.ProviderType.DOCTOR,
+            user=self.provider_user, provider_type=ProviderProfile.ProviderType.CLINIC,
             clinic_name='Test Clinic')
         self.patient = make('pat@example.com', User.Role.PATIENT)
 
@@ -163,7 +163,7 @@ class HealthEventApprovalTests(TestCase):
         self.admin = make('admin@example.com', User.Role.ADMIN)
         self.provider_user = make('doc@example.com', User.Role.PROVIDER)
         self.profile = ProviderProfile.objects.create(
-            user=self.provider_user, provider_type=ProviderProfile.ProviderType.DOCTOR,
+            user=self.provider_user, provider_type=ProviderProfile.ProviderType.CLINIC,
             clinic_name='Test Clinic',
             verification_status=ProviderProfile.Verification.VERIFIED)
         self.patient = make('pat@example.com', User.Role.PATIENT)
@@ -324,7 +324,7 @@ class PlatformSettingsTests(TestCase):
         self.client.post(reverse('register'), {
             'full_name': 'Doc Tor', 'email': 'doc@example.com',
             'phone_number': '+91 90000 00000', 'role': User.Role.PROVIDER,
-            'provider_type': 'DOCTOR',
+            'provider_type': 'CLINIC',
             'password': PASSWORD, 'confirm_password': PASSWORD,
         })
         self.assertFalse(User.objects.filter(email='doc@example.com').exists())

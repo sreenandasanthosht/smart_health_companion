@@ -1,0 +1,62 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Services &amp; Pricing &middot; CareNest{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar_provider.html' with active='services' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">{{ group_label }}</span>
+        <h1>Services &amp; pricing</h1>
+        <div class="page-sub">What {{ profile.display_name }} offers, and what it costs. Patients see the listed
+        ones on your directory profile.</div>
+      </div>
+
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
+
+      <div class="panel"><div class="p-body">
+        <h3 class="p-h"><svg class="ic"><use href="#i-file-text"/></svg> Your service list</h3>
+        <table class="dtable">
+          <thead><tr><th>Service</th><th>Description</th><th>Duration</th><th>Price</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+          {% for s in all_services %}
+            <tr>
+              <td><b>{{ s.name }}</b></td>
+              <td class="s">{{ s.description|default:"&mdash;" }}</td>
+              <td>{% if s.duration_minutes %}{{ s.duration_minutes }} min{% else %}&mdash;{% endif %}</td>
+              <td>{% if s.price %}&#8377;{{ s.price }}{% else %}&mdash;{% endif %}</td>
+              <td>{% if s.is_active %}<span class="pill ok">Listed</span>{% else %}<span class="pill muted">Hidden</span>{% endif %}</td>
+              <td style="text-align:right;white-space:nowrap;">
+                <form method="post" style="display:inline-block;">{% csrf_token %}
+                  <input type="hidden" name="action" value="toggle">
+                  <input type="hidden" name="service_id" value="{{ s.id }}">
+                  <button class="btn btn-ghost" style="padding:6px 10px;font-size:12px;">{% if s.is_active %}Hide{% else %}List{% endif %}</button>
+                </form>
+                <form method="post" style="display:inline-block;">{% csrf_token %}
+                  <input type="hidden" name="action" value="remove">
+                  <input type="hidden" name="service_id" value="{{ s.id }}">
+                  <button class="btn btn-danger-ghost" style="padding:6px 10px;font-size:12px;">Remove</button>
+                </form>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" style="color:var(--muted);">Nothing listed yet. Add your first service below.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+
+        <form method="post" style="display:grid;grid-template-columns:1.3fr 2fr .8fr .8fr auto;gap:8px;margin-top:14px;align-items:center;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="add">
+          <input type="text" name="name" class="inp" placeholder="Service name" required>
+          <input type="text" name="description" class="inp" placeholder="Short description">
+          <input type="number" name="duration_minutes" class="inp" placeholder="Minutes">
+          <input type="number" step="0.01" name="price" class="inp" placeholder="Price">
+          <button class="btn btn-green" style="padding:9px 16px;">Add service</button>
+        </form>
+      </div></div>
+
+{% endblock %}

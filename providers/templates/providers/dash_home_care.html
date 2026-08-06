@@ -1,0 +1,179 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Home Care &middot; CareNest{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar_provider.html' with active='dashboard' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">{{ group_label }}</span>
+        <h1>{{ profile.display_name }}</h1>
+        <div class="page-sub">{{ profile.get_provider_type_display }} &middot; nursing staff, care requests and allocation.</div>
+      </div>
+
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
+
+      <div class="grid stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:22px;">
+        <div class="card stat">
+          <div class="top"><span class="chip orange"><svg class="ic"><use href="#i-bell"/></svg></span><div class="label">Care requests</div></div>
+          <div class="big">{{ requests|length }}</div>
+        </div>
+        <div class="card stat">
+          <div class="top"><span class="chip blue"><svg class="ic"><use href="#i-heart-pulse"/></svg></span><div class="label">Assigned / ongoing</div></div>
+          <div class="big">{{ assigned|length }}</div>
+        </div>
+        <div class="card stat">
+          <div class="top"><span class="chip green"><svg class="ic"><use href="#i-users"/></svg></span><div class="label">Nurses available</div></div>
+          <div class="big">{{ available_staff|length }}</div>
+          <div class="meta">{{ staff|length }} on the team</div>
+        </div>
+        <div class="card stat">
+          <div class="top"><span class="chip purple"><svg class="ic"><use href="#i-check"/></svg></span><div class="label">Completed</div></div>
+          <div class="big">{{ completed_count }}</div>
+          <div class="meta">{{ patient_count }} patient{{ patient_count|pluralize }} served</div>
+        </div>
+      </div>
+
+      <div class="callout info" style="margin-bottom:18px;">
+        <svg class="ic"><use href="#i-shield-alert"/></svg>
+        <div class="c-body">You allocate your own nurses here. Once a nurse is assigned, the visits they log
+        at the patient's home appear through the existing nursing screens, tagged as nurse-recorded.</div>
+      </div>
+
+      <div class="panel" style="margin-bottom:22px;"><div class="p-body">
+        <h3 class="p-h"><svg class="ic"><use href="#i-users"/></svg> Your nursing team</h3>
+        <table class="dtable">
+          <thead><tr><th>Nurse</th><th>Designation</th><th>Qualification</th><th>Experience</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+          {% for s in staff %}
+            <tr>
+              <td><b>{{ s.nurse.display_name }}</b><div class="s">{{ s.nurse.email }}</div></td>
+              <td>{{ s.designation|default:"&mdash;" }}</td>
+              <td>{{ s.qualification|default:"&mdash;" }}</td>
+              <td>{% if s.years_experience %}{{ s.years_experience }} yrs{% else %}&mdash;{% endif %}</td>
+              <td>{% if s.is_available %}<span class="pill ok">Available</span>{% else %}<span class="pill muted">Unavailable</span>{% endif %}</td>
+              <td style="text-align:right;">
+                <form method="post">{% csrf_token %}
+                  <input type="hidden" name="action" value="toggle_staff">
+                  <input type="hidden" name="staff_id" value="{{ s.id }}">
+                  <button class="btn btn-ghost" style="padding:6px 10px;font-size:12px;">Toggle</button>
+                </form>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" style="color:var(--muted);">No nurses on your team yet.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+
+        <form method="post" style="display:grid;grid-template-columns:1.6fr 1.1fr 1.1fr .7fr auto;gap:8px;margin-top:14px;align-items:center;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="add_staff">
+          <select name="nurse_id" class="inp" required>
+            <option value="">Select a nurse account</option>
+            {% for n in free_nurses %}<option value="{{ n.id }}">{{ n.display_name }} &mdash; {{ n.email }}</option>{% endfor %}
+          </select>
+          <input type="text" name="designation" class="inp" placeholder="Registered Nurse">
+          <input type="text" name="qualification" class="inp" placeholder="GNM / BSc Nursing">
+          <input type="number" name="years_experience" class="inp" placeholder="Yrs">
+          <button class="btn btn-green" style="padding:9px 16px;">Add to team</button>
+        </form>
+        <p class="s" style="margin-top:8px;">Nurse accounts are created by an administrator. Anyone already on
+        your team is hidden from this list.</p>
+      </div></div>
+
+      <div class="grid g-2">
+
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-bell"/></svg> New care requests</h3>
+          {% for c in requests %}
+          <div class="lrow" style="flex-direction:column;align-items:stretch;gap:10px;">
+            <div>
+              <div class="t">{{ c.patient.display_name }}</div>
+              <div class="s">{{ c.get_care_type_display }} &middot; {{ c.get_shift_display }} &middot;
+                from {{ c.starts_on|date:"j M Y" }} for {{ c.days_required }} day{{ c.days_required|pluralize }}</div>
+              {% if c.address %}<div class="s">{{ c.address }}</div>{% endif %}
+              {% if c.requirements %}<div class="s">Needs: {{ c.requirements }}</div>{% endif %}
+            </div>
+
+            <form method="post" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="assign">
+              <input type="hidden" name="request_id" value="{{ c.id }}">
+              <select name="staff_id" class="inp" style="flex:1;min-width:160px;" required>
+                <option value="">Assign a nurse</option>
+                {% for s in available_staff %}<option value="{{ s.id }}">{{ s.nurse.display_name }}{% if s.designation %} &mdash; {{ s.designation }}{% endif %}</option>{% endfor %}
+              </select>
+              <input type="text" name="provider_note" class="inp" style="flex:1;min-width:140px;" placeholder="Note">
+              <button class="btn btn-green" style="padding:8px 14px;">Assign</button>
+            </form>
+
+            <form method="post" style="display:flex;gap:8px;align-items:center;">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="decline">
+              <input type="hidden" name="request_id" value="{{ c.id }}">
+              <input type="text" name="provider_note" class="inp" style="flex:1;" placeholder="Reason for declining">
+              <button class="btn btn-danger-ghost" style="padding:8px 14px;">Decline</button>
+            </form>
+          </div>
+          {% empty %}
+          <p style="color:var(--muted);font-size:13.5px;">No new care requests.</p>
+          {% endfor %}
+        </div></div>
+
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-heart-pulse"/></svg> Assigned &amp; ongoing</h3>
+          {% for c in assigned %}
+          <div class="lrow" style="flex-direction:column;align-items:stretch;gap:10px;">
+            <div>
+              <div class="t">{{ c.patient.display_name }} <span class="pill warn">{{ c.get_status_display }}</span></div>
+              <div class="s">{{ c.get_care_type_display }} &middot; {{ c.get_shift_display }}</div>
+              <div class="s">Nurse: <b>{{ c.assigned_staff.nurse.display_name|default:"not assigned" }}</b></div>
+              {% if c.provider_note %}<div class="s">{{ c.provider_note }}</div>{% endif %}
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              {% if c.status == 'ASSIGNED' %}
+              <form method="post">{% csrf_token %}
+                <input type="hidden" name="action" value="start">
+                <input type="hidden" name="request_id" value="{{ c.id }}">
+                <button class="btn btn-ghost" style="padding:8px 14px;">Start care</button>
+              </form>
+              {% endif %}
+              <form method="post">{% csrf_token %}
+                <input type="hidden" name="action" value="complete">
+                <input type="hidden" name="request_id" value="{{ c.id }}">
+                <button class="btn btn-green" style="padding:8px 14px;"><svg class="ic"><use href="#i-check"/></svg> Complete</button>
+              </form>
+            </div>
+          </div>
+          {% empty %}
+          <p style="color:var(--muted);font-size:13.5px;">Nothing assigned right now.</p>
+          {% endfor %}
+        </div></div>
+      </div>
+
+      <div class="panel" style="margin-top:22px;"><div class="p-body">
+        <h3 class="p-h"><svg class="ic"><use href="#i-check"/></svg> Completed care</h3>
+        <table class="dtable">
+          <thead><tr><th>Patient</th><th>Care type</th><th>Shift</th><th>Started</th><th>Days</th><th>Nurse</th></tr></thead>
+          <tbody>
+          {% for c in finished %}
+            <tr>
+              <td>{{ c.patient.display_name }}</td>
+              <td>{{ c.get_care_type_display }}</td>
+              <td>{{ c.get_shift_display }}</td>
+              <td>{{ c.starts_on|date:"j M Y" }}</td>
+              <td>{{ c.days_required }}</td>
+              <td>{{ c.assigned_staff.nurse.display_name|default:"&mdash;" }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" style="color:var(--muted);">No completed care yet.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div></div>
+
+{% endblock %}

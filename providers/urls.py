@@ -6,6 +6,7 @@ urlpatterns = [
     path('directory/', views.directory, name='provider_directory'),
     path('appointments/', views.appointments, name='provider_appointments'),
     path('dashboard/', views.dashboard, name='provider_dashboard'),
+    path('services/', views.services, name='provider_services'),
     path('pending/', views.pending, name='provider_pending'),
     path('my-events/', views.my_events, name='provider_events'),
     path('events/', views.public_events, name='public_events'),

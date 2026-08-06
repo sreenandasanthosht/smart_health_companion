@@ -1,0 +1,163 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Clinical Care &middot; CareNest{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar_provider.html' with active='dashboard' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">{{ group_label }}</span>
+        <h1>{{ profile.display_name }}</h1>
+        <div class="page-sub">{{ profile.get_provider_type_display }}{% if profile.specialty %} &middot; {{ profile.specialty }}{% endif %} &middot; consultations, records and follow-ups.</div>
+      </div>
+
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
+
+      <div class="grid stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:22px;">
+        <div class="card stat">
+          <div class="top"><span class="chip orange"><svg class="ic"><use href="#i-calendar-check"/></svg></span><div class="label">Pending requests</div></div>
+          <div class="big">{{ requests|length }}</div>
+        </div>
+        <div class="card stat">
+          <div class="top"><span class="chip blue"><svg class="ic"><use href="#i-calendar-days"/></svg></span><div class="label">Confirmed upcoming</div></div>
+          <div class="big">{{ upcoming|length }}</div>
+        </div>
+        <div class="card stat">
+          <div class="top"><span class="chip green"><svg class="ic"><use href="#i-users"/></svg></span><div class="label">Patients seen</div></div>
+          <div class="big">{{ total_patients }}</div>
+          <div class="meta">{{ completed_count }} completed visit{{ completed_count|pluralize }}</div>
+        </div>
+        <div class="card stat">
+          <div class="top"><span class="chip purple"><svg class="ic"><use href="#i-clock"/></svg></span><div class="label">Follow-ups due</div></div>
+          <div class="big">{{ follow_ups|length }}</div>
+        </div>
+      </div>
+
+      <div class="grid g-2">
+
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-calendar-check"/></svg> Appointment requests</h3>
+          {% for r in requests %}
+          <div class="lrow" style="flex-direction:column;align-items:stretch;gap:10px;">
+            <div>
+              <div class="t">{{ r.patient.display_name }}</div>
+              <div class="s">{{ r.scheduled_for|date:"D, j M Y - g:i A" }}</div>
+              {% if r.reason %}<div class="s">{{ r.reason }}</div>{% endif %}
+            </div>
+            <div style="display:flex;gap:8px;">
+              <form method="post">{% csrf_token %}
+                <input type="hidden" name="appointment_id" value="{{ r.id }}">
+                <input type="hidden" name="action" value="accept">
+                <button type="submit" class="btn btn-green" style="padding:8px 14px;"><svg class="ic"><use href="#i-check"/></svg> Accept</button>
+              </form>
+              <form method="post">{% csrf_token %}
+                <input type="hidden" name="appointment_id" value="{{ r.id }}">
+                <input type="hidden" name="action" value="decline">
+                <button type="submit" class="btn btn-danger-ghost" style="padding:8px 14px;">Decline</button>
+              </form>
+            </div>
+          </div>
+          {% empty %}
+          <p style="color:var(--muted);font-size:13.5px;">No pending requests.</p>
+          {% endfor %}
+        </div></div>
+
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-stethoscope"/></svg> Upcoming consultations</h3>
+          {% for u in upcoming %}
+          <div class="lrow" style="flex-direction:column;align-items:stretch;gap:10px;">
+            <div style="display:flex;gap:12px;align-items:center;">
+              <span class="ri tint-blue" style="width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:0 0 40px;">
+                <svg class="ic"><use href="#i-user"/></svg></span>
+              <div class="grow">
+                <div class="t">{{ u.patient.display_name }}</div>
+                <div class="s">{{ u.scheduled_for|date:"D, j M - g:i A" }}{% if u.department %} &middot; {{ u.department.name }}{% endif %}{% if u.reason %} &middot; {{ u.reason }}{% endif %}</div>
+              </div>
+            </div>
+
+            <form method="post" style="display:grid;gap:8px;">{% csrf_token %}
+              <input type="hidden" name="appointment_id" value="{{ u.id }}">
+              <input type="hidden" name="action" value="consult_note">
+              <input type="text" name="diagnosis" class="inp" placeholder="Diagnosis / impression" value="{{ u.diagnosis }}">
+              <textarea name="advice" class="inp" placeholder="Advice given to the patient">{{ u.advice }}</textarea>
+              <input type="text" name="note" class="inp" placeholder="Private clinical note" value="{{ u.provider_note }}">
+              <label class="s" style="display:flex;gap:8px;align-items:center;">Follow-up on
+                <input type="date" name="follow_up_on" class="inp" style="max-width:180px;"
+                       value="{{ u.follow_up_on|date:'Y-m-d' }}"></label>
+              <button type="submit" class="btn btn-ghost" style="padding:8px 12px;font-size:12.5px;">Save consultation record</button>
+            </form>
+
+            <form method="post">{% csrf_token %}
+              <input type="hidden" name="appointment_id" value="{{ u.id }}">
+              <input type="hidden" name="action" value="complete">
+              <button type="submit" class="btn btn-green" style="padding:7px 12px;font-size:12.5px;">Mark completed</button>
+            </form>
+          </div>
+          {% empty %}
+          <p style="color:var(--muted);font-size:13.5px;">No upcoming consultations.</p>
+          {% endfor %}
+        </div></div>
+      </div>
+
+      {% if profile.is_hospital %}
+      <div class="panel" style="margin-top:22px;"><div class="p-body">
+        <h3 class="p-h"><svg class="ic"><use href="#i-users"/></svg> Departments</h3>
+        <p class="s" style="margin-bottom:12px;">Patients choose a department when they book with a hospital. Small clinics do not need this.</p>
+
+        <table class="dtable">
+          <thead><tr><th>Department</th><th>Head</th><th>Consulting hours</th><th></th></tr></thead>
+          <tbody>
+          {% for d in departments %}
+            <tr>
+              <td><b>{{ d.name }}</b>{% if d.description %}<div class="s">{{ d.description }}</div>{% endif %}</td>
+              <td>{{ d.head_name|default:"&mdash;" }}</td>
+              <td>{{ d.consulting_hours|default:"&mdash;" }}</td>
+              <td style="text-align:right;">
+                <form method="post">{% csrf_token %}
+                  <input type="hidden" name="action" value="remove_department">
+                  <input type="hidden" name="department_id" value="{{ d.id }}">
+                  <button class="btn btn-danger-ghost" style="padding:6px 10px;font-size:12px;">Remove</button>
+                </form>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" style="color:var(--muted);">No departments added yet.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+
+        <form method="post" style="display:grid;grid-template-columns:repeat(4,1fr) auto;gap:8px;margin-top:14px;align-items:center;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="add_department">
+          <input type="text" name="name" class="inp" placeholder="Department name" required>
+          <input type="text" name="head_name" class="inp" placeholder="Head of department">
+          <input type="text" name="consulting_hours" class="inp" placeholder="Mon-Sat, 9 AM - 1 PM">
+          <input type="text" name="description" class="inp" placeholder="Short description">
+          <button class="btn btn-green" style="padding:9px 16px;">Add</button>
+        </form>
+      </div></div>
+      {% endif %}
+
+      <div class="panel" style="margin-top:22px;"><div class="p-body">
+        <h3 class="p-h"><svg class="ic"><use href="#i-check"/></svg> Recently completed</h3>
+        <table class="dtable">
+          <thead><tr><th>Patient</th><th>Seen on</th><th>Diagnosis</th><th>Follow-up</th></tr></thead>
+          <tbody>
+          {% for c in completed %}
+            <tr>
+              <td>{{ c.patient.display_name }}</td>
+              <td>{{ c.scheduled_for|date:"j M Y" }}</td>
+              <td>{{ c.diagnosis|default:"&mdash;" }}</td>
+              <td>{% if c.follow_up_on %}<span class="pill warn">{{ c.follow_up_on|date:"j M" }}</span>{% else %}&mdash;{% endif %}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" style="color:var(--muted);">No completed consultations yet.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div></div>
+
+{% endblock %}
