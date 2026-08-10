@@ -1,0 +1,142 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Pharmacy &middot; CareNest{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar_provider.html' with active='dashboard' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">{{ group_label }}</span>
+        <h1>{{ profile.display_name }}</h1>
+        <div class="page-sub">{{ profile.get_provider_type_display }} &middot; prescription orders, availability and fulfilment.</div>
+      </div>
+
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
+
+      <div class="grid stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:22px;">
+        <div class="card stat">
+          <div class="top"><span class="chip orange"><svg class="ic"><use href="#i-pill"/></svg></span><div class="label">New orders</div></div>
+          <div class="big">{{ new_orders|length }}</div>
+        </div>
+        <div class="card stat">
+          <div class="top"><span class="chip blue"><svg class="ic"><use href="#i-activity"/></svg></span><div class="label">In progress</div></div>
+          <div class="big">{{ active_orders|length }}</div>
+        </div>
+        <div class="card stat">
+          <div class="top"><span class="chip green"><svg class="ic"><use href="#i-check"/></svg></span><div class="label">Delivered</div></div>
+          <div class="big">{{ delivered_count }}</div>
+        </div>
+        <div class="card stat">
+          <div class="top"><span class="chip purple"><svg class="ic"><use href="#i-users"/></svg></span><div class="label">Patients served</div></div>
+          <div class="big">{{ patient_count }}</div>
+        </div>
+      </div>
+
+      <div class="callout info" style="margin-bottom:18px;">
+        <svg class="ic"><use href="#i-upload-cloud"/></svg>
+        <div class="c-body">Orders arrive with the medicines a patient confirmed from their uploaded
+        prescription, so nothing has to be typed twice. Mark anything you cannot supply as unavailable
+        and note a substitute &mdash; the patient sees both before collecting.</div>
+      </div>
+
+      <div class="panel" style="margin-bottom:22px;"><div class="p-body">
+        <h3 class="p-h"><svg class="ic"><use href="#i-pill"/></svg> New orders</h3>
+        {% for o in new_orders %}
+        <div class="lrow" style="flex-direction:column;align-items:stretch;gap:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div>
+              <div class="t">Order #{{ o.pk }} &middot; {{ o.patient.display_name }}</div>
+              <div class="s">{{ o.placed_at|date:"j M Y, g:i A" }} &middot; {{ o.get_fulfilment_display }}
+                {% if o.prescription_reference %}&middot; from {{ o.prescription_reference }}{% endif %}</div>
+              {% if o.fulfilment == 'DELIVERY' and o.delivery_address %}<div class="s">Deliver to: {{ o.delivery_address }}</div>{% endif %}
+              {% if o.patient_note %}<div class="s">Note: {{ o.patient_note }}</div>{% endif %}
+            </div>
+            <div class="t">&#8377;{{ o.total }}</div>
+          </div>
+
+          {% for it in o.items.all %}
+          <form method="post" style="display:grid;grid-template-columns:1.5fr .8fr .4fr .8fr auto 1.1fr auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="item">
+            <input type="hidden" name="item_id" value="{{ it.id }}">
+            <div><b>{{ it.medicine_name }}</b></div>
+            <div class="s">{{ it.strength|default:"&mdash;" }}</div>
+            <div class="s">x{{ it.quantity }}</div>
+            <input type="number" step="0.01" name="unit_price" class="inp" placeholder="Price" value="{{ it.unit_price|default_if_none:'' }}">
+            <label class="s" style="display:flex;gap:6px;align-items:center;white-space:nowrap;">
+              <input type="checkbox" name="is_available" {% if it.is_available %}checked{% endif %}> In stock</label>
+            <input type="text" name="substitute_note" class="inp" placeholder="Substitute" value="{{ it.substitute_note }}">
+            <button class="btn btn-ghost" style="padding:6px 10px;font-size:12px;">Save</button>
+          </form>
+          {% empty %}
+          <p style="color:var(--muted);font-size:13.5px;">No lines on this order.</p>
+          {% endfor %}
+
+          <form method="post" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="status">
+            <input type="hidden" name="order_id" value="{{ o.pk }}">
+            <input type="text" name="pharmacy_note" class="inp" style="flex:1;min-width:200px;" placeholder="Note for the patient" value="{{ o.pharmacy_note }}">
+            <select name="status" class="inp" style="max-width:200px;">
+              {% for value, label in o.next_options %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-green" style="padding:9px 16px;">Update order</button>
+          </form>
+        </div>
+        {% empty %}
+        <p style="color:var(--muted);font-size:13.5px;">No new orders waiting.</p>
+        {% endfor %}
+      </div></div>
+
+      <div class="panel" style="margin-bottom:22px;"><div class="p-body">
+        <h3 class="p-h"><svg class="ic"><use href="#i-activity"/></svg> Orders in progress</h3>
+        {% for o in active_orders %}
+        <div class="lrow" style="flex-direction:column;align-items:stretch;gap:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div>
+              <div class="t">Order #{{ o.pk }} &middot; {{ o.patient.display_name }}
+                <span class="pill warn">{{ o.get_status_display }}</span></div>
+              <div class="s">{{ o.items.count }} item{{ o.items.count|pluralize }} &middot; {{ o.get_fulfilment_display }} &middot; &#8377;{{ o.total }}</div>
+            </div>
+          </div>
+          <form method="post" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="status">
+            <input type="hidden" name="order_id" value="{{ o.pk }}">
+            <input type="text" name="pharmacy_note" class="inp" style="flex:1;min-width:200px;" placeholder="Note for the patient" value="{{ o.pharmacy_note }}">
+            <select name="status" class="inp" style="max-width:200px;">
+              {% for value, label in o.next_options %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-green" style="padding:9px 16px;">Move on</button>
+          </form>
+        </div>
+        {% empty %}
+        <p style="color:var(--muted);font-size:13.5px;">Nothing in progress.</p>
+        {% endfor %}
+      </div></div>
+
+      <div class="panel"><div class="p-body">
+        <h3 class="p-h"><svg class="ic"><use href="#i-check"/></svg> Closed orders</h3>
+        <table class="dtable">
+          <thead><tr><th>Order</th><th>Patient</th><th>Placed</th><th>Items</th><th>Total</th><th>Outcome</th></tr></thead>
+          <tbody>
+          {% for o in closed_orders %}
+            <tr>
+              <td>#{{ o.pk }}</td>
+              <td>{{ o.patient.display_name }}</td>
+              <td>{{ o.placed_at|date:"j M Y" }}</td>
+              <td>{{ o.items.count }}</td>
+              <td>&#8377;{{ o.total }}</td>
+              <td><span class="pill {% if o.status == 'DELIVERED' %}ok{% else %}muted{% endif %}">{{ o.get_status_display }}</span></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" style="color:var(--muted);">No closed orders yet.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div></div>
+
+{% endblock %}

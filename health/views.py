@@ -24,13 +24,19 @@ from adminpanel.models import AuditLog
 from health import analytics
 from health import extraction
 from health.models import (
-
-    ConsentGrant, ExtractedMedication, ExtractionJob, LifestyleLog, Medication,
-    MedicationDose, MoodLog, VitalRecord, has_consent,
-
-    ConsentGrant, HealthDocument, LifestyleLog, Medication, MedicationDose,
-    MoodLog, SCOPE_FIELDS, VitalRecord, consent_matrix, has_consent,
-
+    ConsentGrant,
+    ExtractedMedication,
+    ExtractionJob,
+    HealthDocument,
+    LifestyleLog,
+    Medication,
+    MedicationDose,
+    MoodLog,
+    SCOPE_FIELDS,
+    VitalRecord,
+    consent_matrix,
+    has_consent,
+)
 )
 from providers.models import Appointment, CarePlan, ProviderProfile
 

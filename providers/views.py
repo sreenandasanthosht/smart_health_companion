@@ -18,13 +18,21 @@ from accounts.models import User
 from adminpanel.models import AuditLog
 from health import analytics
 from health.models import ConsentGrant, Medication, has_consent
-from providers.models import Appointment, CarePlan, HealthEvent, ProviderAvailability, ProviderProfile
+from providers.dashboards import GROUP_DASHBOARDS, services_page
+from providers.models import (
+    Appointment,
+    CarePlan,
+    HealthEvent,
+    ProviderAvailability,
+    ProviderProfile,
+)
 
 
 @role_required(User.Role.PATIENT, User.Role.CAREGIVER)
 def directory(request):
     query = request.GET.get('q', '').strip()
     ptype = request.GET.get('type', '').strip()
+    group = request.GET.get('group', '').strip()
 
     providers = ProviderProfile.objects.filter(
         verification_status=ProviderProfile.Verification.VERIFIED,
@@ -35,6 +43,10 @@ def directory(request):
             Q(clinic_name__icontains=query) | Q(specialty__icontains=query)
             | Q(user__first_name__icontains=query) | Q(user__last_name__icontains=query)
         )
+    # Group is the broad filter ("show me anything to do with wellness"),
+    # type is the narrow one ("yoga centres only").
+    if group in ProviderProfile.ServiceGroup.values:
+        providers = providers.filter(provider_type__in=ProviderProfile.types_in_group(group))
     if ptype:
         providers = providers.filter(provider_type=ptype)
 
@@ -42,7 +54,9 @@ def directory(request):
         'providers': providers,
         'query': query,
         'selected_type': ptype,
+        'selected_group': group,
         'types': ProviderProfile.ProviderType.choices,
+        'groups': ProviderProfile.ServiceGroup.choices,
     }
     return render(request, 'providers/directory.html', context)
 
@@ -109,46 +123,52 @@ def appointments(request):
     return render(request, 'providers/appointments.html', context)
 
 
-@role_required(User.Role.PROVIDER)
-def dashboard(request):
+def _verified_profile_or_redirect(request):
+    """
+    Shared gate for every provider-only page.
+
+    Returns (profile, None) when the caller may proceed, or
+    (None, redirect) when they may not -- no profile yet, or still waiting
+    on verification.
+    """
     profile = ProviderProfile.objects.filter(user=request.user).first()
     if not profile:
         messages.info(request, 'Complete your provider profile to get started.')
-        return redirect('provider_pending')
+        return None, redirect('provider_pending')
     if not profile.is_verified:
-        return redirect('provider_pending')
+        return None, redirect('provider_pending')
+    return profile, None
 
-    if request.method == 'POST':
-        appt = get_object_or_404(Appointment, pk=request.POST.get('appointment_id'), provider=profile)
-        action = request.POST.get('action')
-        if action == 'accept':
-            appt.status = Appointment.Status.CONFIRMED
-            appt.save(update_fields=['status'])
-            messages.success(request, f'Appointment with {appt.patient.display_name} confirmed.')
-        elif action == 'decline':
-            appt.status = Appointment.Status.DECLINED
-            appt.save(update_fields=['status'])
-            messages.info(request, 'Request declined.')
-        elif action == 'complete':
-            appt.status = Appointment.Status.COMPLETED
-            appt.save(update_fields=['status'])
-            messages.success(request, 'Marked as completed.')
-        elif action == 'note':
-            appt.provider_note = request.POST.get('note', '').strip()
-            appt.save(update_fields=['provider_note'])
-            messages.success(request, 'Note saved.')
-        return redirect('provider_dashboard')
 
-    appts = Appointment.objects.filter(provider=profile).select_related('patient')
-    now = timezone.now()
-    context = {
-        'profile': profile,
-        'requests': [a for a in appts if a.status == Appointment.Status.REQUESTED],
-        'upcoming': [a for a in appts if a.status == Appointment.Status.CONFIRMED and a.scheduled_for >= now],
-        'completed_count': sum(1 for a in appts if a.status == Appointment.Status.COMPLETED),
-        'total_patients': len({a.patient_id for a in appts}),
-    }
-    return render(request, 'providers/dashboard.html', context)
+@role_required(User.Role.PROVIDER)
+def dashboard(request):
+    """
+    One URL, six dashboards.
+
+    Which one a provider sees is decided entirely by the service they
+    chose at registration. Keeping a single `provider_dashboard` URL name
+    means the login redirect, the role decorators and every existing
+    template link keep working untouched.
+    """
+    profile, bounce = _verified_profile_or_redirect(request)
+    if bounce:
+        return bounce
+
+    handler = GROUP_DASHBOARDS.get(profile.service_group)
+    if handler is None:
+        # Unreachable while GROUP_OF_TYPE covers every type, but a provider
+        # is better served by the clinical screen than by a 500.
+        handler = GROUP_DASHBOARDS[ProviderProfile.ServiceGroup.CLINICAL]
+    return handler(request, profile)
+
+
+@role_required(User.Role.PROVIDER)
+def services(request):
+    """The service / price list, shared by all six groups."""
+    profile, bounce = _verified_profile_or_redirect(request)
+    if bounce:
+        return bounce
+    return services_page(request, profile)
 
 
 @role_required(User.Role.PROVIDER)

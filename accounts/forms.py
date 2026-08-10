@@ -14,17 +14,23 @@ PUBLIC_ROLE_CHOICES = [
     (User.Role.PROVIDER, 'Provider'),
 ]
 
-PROVIDER_TYPE_CHOICES = [
-    ('', 'Select provider type'),
-    ('DOCTOR', 'Doctor'),
-    ('CLINIC', 'Clinic'),
-    ('HOSPITAL', 'Hospital'),
-    ('DIAGNOSTIC_LAB', 'Diagnostic Lab'),
-    ('PHARMACY', 'Pharmacy'),
-    ('DIETICIAN', 'Dietician'),
-    ('FITNESS_CENTRE', 'Fitness Centre'),
-    ('WELLNESS_CENTRE', 'Wellness Centre'),
-]
+def provider_type_choices():
+    """
+    The service a provider picks at registration, grouped by module.
+
+    Built from `ProviderProfile` rather than repeated here, so the list can
+    never drift from the model. The <optgroup> headings are the six service
+    groups, which is how the provider learns which dashboard they will get
+    before they submit.
+    """
+    from providers.models import ProviderProfile as P
+
+    grouped = []
+    for group, group_label in P.ServiceGroup.choices:
+        options = [(t, P.ProviderType(t).label) for t in P.types_in_group(group)]
+        if options:
+            grouped.append((group_label, options))
+    return [('', 'Select the service you provide')] + grouped
 
 
 def public_role_choices():
@@ -56,6 +62,7 @@ class RegisterForm(forms.Form):
         # Resolved per-request rather than at import time, so a settings
         # change takes effect without a restart.
         self.fields['role'].choices = public_role_choices()
+        self.fields['provider_type'].choices = provider_type_choices()
     password = forms.CharField(widget=forms.PasswordInput(
         attrs={'class': 'form-control', 'placeholder': 'Create a password'}))
     confirm_password = forms.CharField(widget=forms.PasswordInput(
@@ -71,9 +78,10 @@ class RegisterForm(forms.Form):
             'class': 'form-control',
             'placeholder': 'e.g. 4F2A9C1B77, them@example.com or CN-1A2B3C4D',
         }))
-    # Only required when role == PROVIDER
+    # Only required when role == PROVIDER. Choices are resolved per-request
+    # in __init__ so they always match the model.
     provider_type = forms.ChoiceField(
-        choices=PROVIDER_TYPE_CHOICES, required=False,
+        choices=(), required=False,
         widget=forms.Select(attrs={'class': 'form-control'}))
 
     def clean(self):

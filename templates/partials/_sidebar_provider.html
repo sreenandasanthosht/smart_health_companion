@@ -7,7 +7,9 @@
     </div>
 
     <nav class="nav">
-      <a class="nav-item {% if active == 'dashboard' %}active{% endif %}" href="{% url 'provider_dashboard' %}"><svg class="ic"><use href="#i-home"/></svg> Dashboard</a>
+      <a class="nav-item {% if active == 'dashboard' %}active{% endif %}" href="{% url 'provider_dashboard' %}"><svg class="ic"><use href="#i-home"/></svg>
+        {% if profile %}{{ profile.service_group_label }}{% else %}Dashboard{% endif %}</a>
+      <a class="nav-item {% if active == 'services' %}active{% endif %}" href="{% url 'provider_services' %}"><svg class="ic"><use href="#i-file-text"/></svg> Services &amp; Pricing</a>
       <a class="nav-item {% if active == 'pending' %}active{% endif %}" href="{% url 'provider_pending' %}"><svg class="ic"><use href="#i-shield-alert"/></svg> Verification Status</a>
       <a class="nav-item {% if active == 'events' %}active{% endif %}" href="{% url 'provider_events' %}"><svg class="ic"><use href="#i-calendar-days"/></svg> Health Camps &amp; Events</a>
       <a class="nav-item {% if active == 'care_plans' %}active{% endif %}" href="{% url 'provider_care_plans' %}"><svg class="ic"><use href="#i-target"/></svg> Care Plans</a>
