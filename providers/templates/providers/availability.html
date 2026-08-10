@@ -1,0 +1,58 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Availability &middot; CareNest{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar_provider.html' with active='availability' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Provider</span>
+        <h1>Availability</h1>
+        <div class="page-sub">Set your weekly hours. Patients can only request appointments inside these windows once you've added any.</div>
+      </div>
+
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
+
+      <div class="grid g-7-5">
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-clock"/></svg> Your weekly hours</h3>
+          {% for w in windows %}
+          <div class="lrow">
+            <span class="ri tint-blue" style="width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:0 0 36px;">
+              <svg class="ic"><use href="#i-clock"/></svg></span>
+            <div class="grow">
+              <div class="t">{{ w.get_weekday_display }}</div>
+              <div class="s">{{ w.start_time|time:"g:i A" }} &ndash; {{ w.end_time|time:"g:i A" }}</div>
+            </div>
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="remove">
+              <input type="hidden" name="row_id" value="{{ w.id }}">
+              <button type="submit" class="btn btn-danger-ghost" style="padding:7px 12px;font-size:12.5px;">Remove</button>
+            </form>
+          </div>
+          {% empty %}
+          <p style="color:var(--muted);font-size:13.5px;">No hours set yet &mdash; patients can currently book any time.</p>
+          {% endfor %}
+        </div></div>
+
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-clock"/></svg> Add a window</h3>
+          <form method="post">
+            {% csrf_token %}
+            <div class="field"><label>Day</label>
+              <select class="inp" name="weekday" required>
+                {% for value, label in weekdays %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+              </select></div>
+            <div class="field"><label>Start time</label><input type="time" name="start_time" class="inp" required></div>
+            <div class="field"><label>End time</label><input type="time" name="end_time" class="inp" required></div>
+            <button type="submit" class="btn btn-teal block">Add window</button>
+            <div class="hint">Add one row per day you're available &mdash; you can add several windows on the same day.</div>
+          </form>
+        </div></div>
+      </div>
+
+{% endblock %}

@@ -24,6 +24,16 @@ DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
+# Separate from ALLOWED_HOSTS: Django's CSRF protection checks the Origin
+# header of every POST (login, register, any form) against this list too.
+# Without it, forms fail with "CSRF verification failed" even though the
+# page itself loads fine -- as happened when accessing through a Cloudflare
+# quick tunnel. Empty by default (plain localhost needs nothing extra);
+# set e.g. CSRF_TRUSTED_ORIGINS=https://*.trycloudflare.com in .env to
+# allow a tunnel domain, wildcard included since the random subdomain
+# changes every time the tunnel restarts.
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()]
+
 # --- Applications ---
 INSTALLED_APPS = [
     'django.contrib.admin',

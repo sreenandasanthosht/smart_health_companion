@@ -71,6 +71,8 @@
                 <svg class="ic"><use href="#i-user"/></svg></span>
               <div class="grow"><div class="t">{{ u.patient.display_name }}</div>
                 <div class="s">{{ u.scheduled_for|date:"D, j M - g:i A" }}{% if u.reason %} &middot; {{ u.reason }}{% endif %}</div></div>
+              <a href="{% url 'provider_previsit_snapshot' u.id %}" class="btn btn-ghost" style="padding:7px 12px;font-size:12.5px;white-space:nowrap;">
+                <svg class="ic"><use href="#i-file-text"/></svg> Snapshot</a>
             </div>
             <form method="post" style="display:flex;gap:8px;align-items:center;">
               {% csrf_token %}

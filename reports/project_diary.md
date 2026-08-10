@@ -242,3 +242,74 @@ separately in `reports/extraction_accuracy.md`.
 
 ---
 
+## 2026-08-04 — Caregiver security (Terese's branch merged in)
+**Who:** Terese
+**Phase:** unplanned, alongside Phase 2/3
+
+**Done:** `CaregiverInvite`, `Notification` and `TrustedDevice` models;
+invite-code-or-email-or-CareNest-ID resolution for linking a caregiver to a
+patient (`accounts/linking.py`); new-device sign-in approval for caregivers,
+gated on `PlatformSettings.caregiver_device_approval_required`
+(`accounts/devices.py`); a `Super Admin` distinction on top of `Admin`.
+
+**Why:** Not part of the original phase plan — this was built independently
+and arrived via `git pull`. Landed cleanly: migrations apply in sequence
+(`accounts.0006`–`0008`), all tests pass, no conflicts with Phase 2/3 work.
+
+**Blocked / open:** These features are not yet reflected in `docs/erd.md`,
+`docs/use_cases.md` or the task tracker, which still describe the system as
+of Phase 1. Needs a documentation catch-up pass before the report is written.
+
+---
+
+## 2026-08-05 — MySQL, a shared live instance, and Phase 3: Provider Care Loop
+**Who:** Sreenanda
+**Phase:** 3
+
+**Done, infrastructure:**
+- Fixed a Windows-only crash: `%-d` / `%-I` strftime flags (used to drop a
+  leading zero) work on Linux/macOS but raise `ValueError` on Windows, which
+  is exactly the kind of bug that survives testing on the developer's own
+  machine and only shows up after a `git pull` onto a different one. Replaced
+  with a `_friendly_datetime()` helper built from plain arithmetic.
+- Switched the running app from SQLite to the MySQL database the project was
+  designed around (`USE_SQLITE=0`); resolved a driver install and a root
+  password mismatch along the way. All 105 tests passed against MySQL.
+- Added `CSRF_TRUSTED_ORIGINS`, read from `.env`, which the project had never
+  needed before because it had never been reached from any host other than
+  `localhost`.
+- App made temporarily reachable to both project members at once via a
+  Cloudflare quick tunnel (`cloudflared`) pointed at the MySQL-backed local
+  server — same running app, same database, both members see each other's
+  changes live. No separate deployment, no second database to keep in sync.
+
+**Done, Phase 3 — Provider Care Loop:**
+- `ProviderAvailability` (weekly recurring hours) and `CarePlan` (one metric,
+  one target, a review date, a note) models.
+- Pre-visit snapshot (`previsit_snapshot`): shows a provider a patient's
+  recent vitals, medication adherence, active care plans and nursing
+  escalations from the last 30 days — but only for scopes the patient has
+  actually granted, never because an appointment merely exists. A scope not
+  granted renders an explicit "not shared" panel. Every view (and every
+  refusal) is written to the audit log.
+- One-click "share a pre-visit snapshot" action for patients: grants vitals +
+  medications only, expiring 24 hours after the appointment.
+- Care plan creation restricted to patients a provider has actually had an
+  appointment with; progress is computed from the patient's own real data
+  (`CarePlan.progress()`), returning `None` rather than a guessed value when
+  there isn't enough data yet. Shown on the patient dashboard as a goal bar.
+- Booking now validated against a provider's `ProviderAvailability`, if any
+  is set; providers with no configured hours remain bookable any time.
+- 10 new tests (`CareLoopTests`), covering consent-gated visibility, the
+  mental-health exclusion holding under this new view, cross-provider
+  appointment isolation, audit logging, and both availability outcomes.
+
+**Why:** The pre-visit snapshot is the clearest answer to "why does a patient
+need this app when they already have a doctor" — the provider sees three
+months of trend data instead of one recalled number, and only what the
+patient chose to share.
+
+**Next:** Phase 4 — Monitoring, Alerts & Ephemeral Sharing.
+
+---
+

@@ -16,7 +16,7 @@ urlpatterns = [
 
     path('prescription/', views.prescription_upload, name='health_prescription_upload'),
     path('prescription/<int:job_id>/verify/', views.extraction_verify, name='health_extraction_verify'),
-=======
+
     path('notifications/', views.notifications_view, name='notifications'),
     path('report/', views.report_problem, name='report_problem'),
 

@@ -27,12 +27,12 @@ from health.models import (
 
     ConsentGrant, ExtractedMedication, ExtractionJob, LifestyleLog, Medication,
     MedicationDose, MoodLog, VitalRecord, has_consent,
-=======
+
     ConsentGrant, HealthDocument, LifestyleLog, Medication, MedicationDose,
     MoodLog, SCOPE_FIELDS, VitalRecord, consent_matrix, has_consent,
 
 )
-from providers.models import Appointment, ProviderProfile
+from providers.models import Appointment, CarePlan, ProviderProfile
 
 
 def _refill_label(medication):
@@ -44,6 +44,22 @@ def _refill_label(medication):
     if days_left == 0:
         return 'Today'
     return f"{days_left} days"
+
+
+def _friendly_datetime(value):
+    """
+    Format a datetime as e.g. "4 Aug at 6:05 PM".
+
+    Written without the %-d / %-I strftime flags: those strip leading zeros
+    on Linux/macOS but raise ValueError('Invalid format string') on Windows.
+    Building the no-leading-zero parts in Python keeps this working on any
+    operating system.
+    """
+    if not value:
+        return ''
+    dt = timezone.localtime(value)          # settings.TIME_ZONE, since USE_TZ=True
+    hour_12 = dt.hour % 12 or 12            # 0 -> 12 (midnight), 13 -> 1
+    return f'{dt.day} {dt:%b} at {hour_12}:{dt:%M} {dt:%p}'
 
 
 def _parse_decimal(raw):
@@ -163,6 +179,7 @@ def dashboard(request):
         'show_profile_prompt': patient.profile_completion() < 100,
         'pending_caregivers': CaregiverLink.objects.filter(
             patient=patient, status=CaregiverLink.Status.PENDING).select_related('caregiver'),
+        'care_plans': CarePlan.objects.filter(patient=patient, active=True).select_related('provider'),
     }
     return render(request, 'health/dashboard.html', context)
 
@@ -535,7 +552,7 @@ def caregiver_dashboard(request):
         needs_attention.append({
             'title': 'Latest reading is high',
             'detail': f'{latest_vital.bp_systolic}/{latest_vital.bp_diastolic} on '
-                      f'{latest_vital.recorded_at:%-d %b at %-I:%M %p}',
+                      f'{_friendly_datetime(latest_vital.recorded_at)}',
             'level': 'danger',
         })
     if can_medications and missed:

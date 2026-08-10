@@ -21,7 +21,8 @@ from health.models import (
     MoodLog, VitalRecord,
 )
 from nursing.models import NurseAssignment, NursingVisit
-from providers.models import Appointment, ProviderProfile
+from providers.models import Appointment, CarePlan, ProviderAvailability, ProviderProfile
+from adminpanel.models import AuditLog
 
 User = get_user_model()
 PW = 'TestPass#2026'
@@ -620,3 +621,133 @@ class ExtractionTests(TestCase):
     def test_non_patient_cannot_reach_the_upload_page(self):
         self.client.force_login(make('prov2@example.com', User.Role.PROVIDER))
         self.assertEqual(self.client.get(reverse('health_prescription_upload')).status_code, 302)
+
+
+class CareLoopTests(TestCase):
+    """Phase 3 -- pre-visit snapshot, care plans, and availability-checked booking."""
+
+    def setUp(self):
+        self.patient = make('loop-patient@example.com', User.Role.PATIENT)
+        self.provider = make('loop-provider@example.com', User.Role.PROVIDER)
+        self.profile = ProviderProfile.objects.create(
+            user=self.provider, provider_type=ProviderProfile.ProviderType.DOCTOR,
+            specialty='Cardiology', clinic_name='Loop Clinic')
+        self.profile.approve()
+        self.appt = Appointment.objects.create(
+            patient=self.patient, provider=self.profile,
+            scheduled_for=timezone.now() + datetime.timedelta(days=2),
+            status=Appointment.Status.CONFIRMED,
+        )
+
+    def test_provider_without_consent_sees_the_not_shared_panel(self):
+        self.client.force_login(self.provider)
+        resp = self.client.get(reverse('provider_previsit_snapshot', args=[self.appt.id]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.context['can_see_vitals'])
+        self.assertFalse(resp.context['can_see_meds'])
+        self.assertContains(resp, "hasn't shared")
+
+    def test_sharing_a_snapshot_grants_only_vitals_and_medications(self):
+        self.client.force_login(self.patient)
+        self.client.post(reverse('provider_previsit_share'), {
+            'appointment_id': self.appt.id, 'next': reverse('provider_appointments'),
+        })
+        grant = ConsentGrant.objects.get(patient=self.patient, recipient=self.provider)
+        self.assertTrue(grant.scope_vitals)
+        self.assertTrue(grant.scope_medications)
+        self.assertFalse(grant.scope_records)
+        self.assertIsNotNone(grant.expires_at)
+        self.assertEqual(grant.expires_at, self.appt.scheduled_for + datetime.timedelta(hours=24))
+
+    def test_provider_sees_data_only_after_consent_is_shared(self):
+        VitalRecord.objects.create(patient=self.patient, bp_systolic=118, bp_diastolic=76)
+        self.client.force_login(self.patient)
+        self.client.post(reverse('provider_previsit_share'), {'appointment_id': self.appt.id})
+
+        self.client.force_login(self.provider)
+        resp = self.client.get(reverse('provider_previsit_snapshot', args=[self.appt.id]))
+        self.assertTrue(resp.context['can_see_vitals'])
+        self.assertContains(resp, '118')
+
+    def test_snapshot_never_contains_mood_log_text(self):
+        MoodLog.objects.create(patient=self.patient, mood='Anxious', note='very private note xyzzy')
+        self.client.force_login(self.patient)
+        self.client.post(reverse('provider_previsit_share'), {'appointment_id': self.appt.id})
+        self.client.force_login(self.provider)
+        resp = self.client.get(reverse('provider_previsit_snapshot', args=[self.appt.id]))
+        self.assertNotContains(resp, 'very private note xyzzy')
+
+    def test_provider_cannot_open_a_snapshot_for_someone_elses_appointment(self):
+        other_provider = make('loop-other-provider@example.com', User.Role.PROVIDER)
+        ProviderProfile.objects.create(
+            user=other_provider, provider_type=ProviderProfile.ProviderType.DOCTOR).approve()
+        self.client.force_login(other_provider)
+        resp = self.client.get(reverse('provider_previsit_snapshot', args=[self.appt.id]))
+        self.assertEqual(resp.status_code, 404)
+
+    def test_viewing_a_snapshot_writes_an_audit_log_entry(self):
+        self.client.force_login(self.patient)
+        self.client.post(reverse('provider_previsit_share'), {'appointment_id': self.appt.id})
+        before = AuditLog.objects.count()
+        self.client.force_login(self.provider)
+        self.client.get(reverse('provider_previsit_snapshot', args=[self.appt.id]))
+        self.assertGreater(AuditLog.objects.count(), before)
+        self.assertTrue(AuditLog.objects.filter(action__icontains='pre-visit snapshot').exists())
+
+    def test_care_plan_cannot_be_created_for_an_unrelated_patient(self):
+        stranger = make('loop-stranger@example.com', User.Role.PATIENT)
+        self.client.force_login(self.provider)
+        self.client.post(reverse('provider_care_plans'), {
+            'patient_id': stranger.id, 'metric': CarePlan.Metric.WEIGHT,
+            'target_value': '70', 'target_direction': CarePlan.Direction.BELOW,
+        })
+        self.assertEqual(CarePlan.objects.filter(patient=stranger).count(), 0)
+
+    def test_care_plan_can_be_created_for_a_treated_patient_and_shows_on_dashboard(self):
+        self.client.force_login(self.provider)
+        self.client.post(reverse('provider_care_plans'), {
+            'patient_id': self.patient.id, 'metric': CarePlan.Metric.BP_SYSTOLIC,
+            'target_value': '130', 'target_direction': CarePlan.Direction.BELOW,
+        })
+        self.assertEqual(CarePlan.objects.filter(patient=self.patient).count(), 1)
+
+        self.client.force_login(self.patient)
+        resp = self.client.get(reverse('health_dashboard'))
+        self.assertEqual(len(resp.context['care_plans']), 1)
+
+    def test_booking_outside_availability_is_rejected(self):
+        # Monday 9am-12pm only.
+        ProviderAvailability.objects.create(
+            provider=self.profile, weekday=ProviderAvailability.Weekday.MONDAY,
+            start_time=datetime.time(9, 0), end_time=datetime.time(12, 0))
+        # Find the next Tuesday, which is outside the window on any week.
+        day = timezone.localdate() + datetime.timedelta(days=1)
+        while day.weekday() != 1:
+            day += datetime.timedelta(days=1)
+        self.client.force_login(self.patient)
+        self.client.post(reverse('provider_appointments'), {
+            'action': 'book', 'provider': self.profile.id,
+            'date': day.isoformat(), 'time': '10:00',
+        })
+        # Compare in Python, not with a `__date` DB lookup: MySQL needs its
+        # named time zone tables loaded (mysql_tzinfo_to_sql) for Django's
+        # USE_TZ-aware date extraction to work; a fresh Windows install
+        # usually doesn't have them, and CONVERT_TZ() then silently returns
+        # NULL, matching nothing even though the row exists.
+        new_appts = Appointment.objects.exclude(pk=self.appt.pk)
+        self.assertFalse(any(timezone.localtime(a.scheduled_for).date() == day for a in new_appts))
+
+    def test_booking_inside_availability_succeeds(self):
+        ProviderAvailability.objects.create(
+            provider=self.profile, weekday=ProviderAvailability.Weekday.MONDAY,
+            start_time=datetime.time(9, 0), end_time=datetime.time(12, 0))
+        day = timezone.localdate() + datetime.timedelta(days=1)
+        while day.weekday() != 0:
+            day += datetime.timedelta(days=1)
+        self.client.force_login(self.patient)
+        self.client.post(reverse('provider_appointments'), {
+            'action': 'book', 'provider': self.profile.id,
+            'date': day.isoformat(), 'time': '10:00',
+        })
+        new_appts = Appointment.objects.exclude(pk=self.appt.pk)
+        self.assertTrue(any(timezone.localtime(a.scheduled_for).date() == day for a in new_appts))
