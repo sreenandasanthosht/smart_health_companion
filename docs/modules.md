@@ -34,10 +34,24 @@
 | M27 | Pharmacy | `providers` | Pharmacies: medicine orders from confirmed prescriptions, per-item availability and pricing, fixed fulfilment path | Implemented |
 | M28 | Wellness Programmes | `providers` | Gyms, dieticians and yoga centres: programmes, enrolments, assigned plans, session logging, progress percentage | Implemented |
 | M29 | Home Care | `providers` | Home nurse providers: own nursing team, care requests, staff allocation — replaces admin-side nurse assignment for agency staff | Implemented |
+| M30 | Dose Scheduling | `health` | `DoseTime` rows giving each medicine a clock time and quantity; parser for 1-0-1, BD/TDS/OD/HS and plain English; unreadable schedules flagged, never guessed | Implemented |
+| M31 | Medication Alerts | `health` | Intake reminder, missed-dose alert and restock warning, all idempotent; `send_medication_alerts` command plus an on-page-load catch-up | Implemented |
+| M32 | Medicine Inventory | `health` | Stock counted down as doses are ticked; refill date computed from consumption rather than typed | Implemented |
+| M33 | Lab Report Extraction | `health` | Own tab; OCR + rule/LLM parsing of an analyte/value/unit/range table; flags computed against the printed reference range, never guessed; report discarded on read | Implemented |
+| M34 | Lab Results History | `health` | Confirmed non-vital values kept as `LabReport` / `LabResultValue`, with a per-analyte trend across reports | Implemented |
+| M35 | Vitals from Lab Reports | `health` | Blood pressure, sugar, weight and pulse routed into `VitalRecord` tagged `LAB_REPORT`, so they join the existing trend charts instead of forming a parallel history | Implemented |
 
 Modules M23–M29 are specified in full in `PROVIDER_MODULES_DESIGN.md`,
 including the grouping rule, the fields each dashboard records, and how each
 module is meant to feed the patient's existing data streams.
+
+Modules M30–M32 are specified in `MEDICATION_ALERTS_DESIGN.md`, including the
+schedule notation the parser understands, the three alert rules, and how the
+scheduled command is set up.
+
+Modules M33–M35 are specified in `LAB_REPORTS_DESIGN.md`, including why lab
+reports were split into their own tab, which analytes count as vitals and
+which do not, and how flags are computed from the printed reference range.
 
 ## Modules removed from the original list
 

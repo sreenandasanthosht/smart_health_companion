@@ -6,6 +6,7 @@ Everything here reads and writes real database rows. Nothing on these
 pages is placeholder data any more.
 """
 import datetime
+from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
 from django.contrib import messages
@@ -21,13 +22,15 @@ from accounts.models import (
     CaregiverInvite, CaregiverLink, Notification, TrustedDevice, User,
 )
 from adminpanel.models import AuditLog
+from health import alerts
 from health import analytics
 from health import extraction
+from health import labvalues
+from health import schedules
 from health.models import (
-    ConsentGrant, HealthDocument, LifestyleLog, Medication, MedicationDose,
-    MoodLog, SCOPE_FIELDS, VitalRecord, consent_matrix, has_consent,
-    ConsentGrant, ExtractedMedication, ExtractionJob, LifestyleLog, Medication,
-    MedicationDose, MoodLog, VitalRecord, has_consent,
+    ConsentGrant, DoseTime, ExtractedLabValue, ExtractedMedication, ExtractionJob,
+    HealthDocument, LabReport, LabResultValue, LifestyleLog, Medication,
+    MedicationDose, MoodLog, SCOPE_FIELDS, VitalRecord, consent_matrix, has_consent,
 )
 from providers.models import Appointment, ProviderProfile
 
@@ -53,6 +56,30 @@ def _parse_int(raw):
     return int(raw) if raw else None
 
 
+def _qty(raw):
+    """
+    A quantity as a Decimal, or None.
+
+    Stock and dose quantities are Decimal columns, and mixing float with
+    Decimal raises at runtime -- so these never go through `_parse_decimal`,
+    which returns floats for the vitals forms. Bad input gives None rather
+    than an exception.
+    """
+    raw = (raw or '').strip()
+    if not raw:
+        return None
+    try:
+        value = Decimal(raw)
+    except InvalidOperation:
+        return None
+    return value if value >= 0 else None
+
+
+def _safe_int(raw):
+    raw = (raw or '').strip()
+    return int(raw) if raw.isdigit() else None
+
+
 # --------------------------------------------------------------------------
 # Patient dashboard
 # --------------------------------------------------------------------------
@@ -67,15 +94,18 @@ def dashboard(request):
     score, band = analytics.health_score(patient)
     series = analytics.vital_series(patient)
 
-    # Today's medication doses -- create the tick rows on first view of the day.
-    active_meds = list(Medication.objects.filter(patient=patient, active=True))
-    for med in active_meds:
-        MedicationDose.objects.get_or_create(medication=med, date=today)
+    # Today's medication doses -- one row per dose time, created here if the
+    # scheduled alert command hasn't already made them, then any outstanding
+    # reminders / missed-dose / restock notifications are raised.
+    alerts.run_medication_alerts(patient=patient)
     todays_doses = (
-        MedicationDose.objects.filter(medication__patient=patient, date=today)
-        .select_related('medication').order_by('medication__name')
+        MedicationDose.objects.filter(medication__patient=patient, date=today,
+                                      dose_time__isnull=False)
+        .select_related('medication', 'dose_time')
+        .order_by('dose_time__at_time', 'medication__name')
     )
     doses_due = todays_doses.filter(taken=False).count()
+    med_summary = alerts.today_summary(patient)
 
     next_appointment = (
         Appointment.objects.filter(
@@ -96,7 +126,7 @@ def dashboard(request):
     activity = []
     for v in VitalRecord.objects.filter(patient=patient)[:3]:
         activity.append({'icon': 'i-heart', 'tint': 'tint-green',
-                         'title': f"Vitals logged -- {v.bp_systolic}/{v.bp_diastolic}",
+                         'title': f"Vitals logged -- {v.bp_display}",
                          'when': v.recorded_at})
     for d in MedicationDose.objects.filter(medication__patient=patient, taken=True).select_related('medication')[:3]:
         activity.append({'icon': 'i-pill', 'tint': 'tint-orange',
@@ -148,6 +178,7 @@ def dashboard(request):
         },
         'doses_due': doses_due,
         'todays_doses': todays_doses,
+        'med_summary': med_summary,
         'next_appointment': next_appointment,
         'upcoming_refill': upcoming_refill,
         'recent_vitals': recent_vitals,
@@ -220,9 +251,12 @@ def medications(request):
         if action == 'toggle_dose':
             dose = get_object_or_404(MedicationDose, pk=request.POST.get('dose_id'),
                                      medication__patient=request.user)
-            dose.taken = not dose.taken
-            dose.taken_at = timezone.now() if dose.taken else None
-            dose.save(update_fields=['taken', 'taken_at'])
+            # mark_taken / mark_not_taken also move the stock count, which is
+            # what makes the restock warning possible.
+            if dose.taken:
+                dose.mark_not_taken()
+            else:
+                dose.mark_taken()
             analytics.generate_insights(request.user)
             return redirect('health_medications')
 
@@ -233,44 +267,177 @@ def medications(request):
             messages.info(request, f'{med.name} marked as no longer active.')
             return redirect('health_medications')
 
+        if action == 'set_times':
+            med = get_object_or_404(Medication, pk=request.POST.get('medication_id'), patient=request.user)
+            _save_dose_times(request, med)
+            return redirect('health_medications')
+
+        if action == 'update_stock':
+            med = get_object_or_404(Medication, pk=request.POST.get('medication_id'), patient=request.user)
+            stock = _qty(request.POST.get('stock_on_hand'))
+            threshold = _safe_int(request.POST.get('restock_threshold_days'))
+            med.stock_on_hand = stock
+            if threshold and threshold > 0:
+                med.restock_threshold_days = threshold
+            # A fresh supply means the previous "running low" warning is
+            # spent, so allow a new one to be raised when it next applies.
+            med.restock_alerted_at = None
+            med.save(update_fields=['stock_on_hand', 'restock_threshold_days', 'restock_alerted_at'])
+            med.recompute_refill_date()
+            messages.success(request, f'Stock updated for {med.name}.')
+            return redirect('health_medications')
+
         name = request.POST.get('name', '').strip()
         dose_text = request.POST.get('dose', '').strip()
         schedule = request.POST.get('schedule', '').strip()
         start_date = request.POST.get('start_date', '').strip()
-        refill = request.POST.get('next_refill_date', '').strip()
-        if not (name and dose_text and schedule and start_date):
-            messages.error(request, 'Please fill in the medicine name, dose, schedule and start date.')
+
+        # Two ways in, and the manual one wins. A patient who ticked the
+        # times themselves has told us exactly what they want; there is no
+        # reason to run their words through a parser as well.
+        manual = _posted_dose_times(request)
+
+        if not (name and dose_text and start_date):
+            messages.error(request, 'Please fill in the medicine name, dose and start date.')
+        elif not (schedule or manual):
+            messages.error(request,
+                           'Either write the schedule (e.g. 1-0-1) or set the times of day yourself.')
         else:
             try:
                 start = datetime.date.fromisoformat(start_date)
-                refill_date = datetime.date.fromisoformat(refill) if refill else None
             except ValueError:
                 messages.error(request, 'Please enter a valid date.')
             else:
-                Medication.objects.create(
-                    patient=request.user, name=name, dose=dose_text, schedule=schedule,
-                    start_date=start, next_refill_date=refill_date,
+                med = Medication.objects.create(
+                    patient=request.user, name=name, dose=dose_text,
+                    schedule=schedule or _describe_slots(manual),
+                    start_date=start,
+                    duration_days=_safe_int(request.POST.get('duration_days')),
+                    quantity_dispensed=_qty(request.POST.get('quantity_dispensed')),
+                    stock_on_hand=_qty(request.POST.get('quantity_dispensed')),
                 )
-                messages.success(request, f'{name} added to your medicines.')
+
+                if manual:
+                    _save_dose_times(request, med, quiet=True)
+                    med.refresh_from_db()
+                    messages.success(
+                        request,
+                        f'{name} added — reminders set for {_describe_slots(manual)}.')
+                else:
+                    parsed = med.set_schedule_from_text()
+                    if parsed.confident:
+                        slot_names = ', '.join(
+                            dt.get_slot_display() for dt in med.dose_times.all())
+                        messages.success(
+                            request, f'{name} added — reminders set for {slot_names}.')
+                    else:
+                        messages.warning(
+                            request,
+                            f'{name} added, but we could not work out the times from '
+                            f'"{schedule}". Set them below so reminders can be sent.')
+                med.recompute_refill_date()
         return redirect('health_medications')
 
     today = timezone.localdate()
-    active_meds = list(Medication.objects.filter(patient=request.user, active=True))
-    for med in active_meds:
-        MedicationDose.objects.get_or_create(medication=med, date=today)
+    # Catch-up pass: the scheduled command is the real trigger, but this
+    # means a patient who opens the page still sees anything outstanding
+    # even if the scheduler isn't running on this machine.
+    alerts.run_medication_alerts(patient=request.user)
+
+    active_meds = list(
+        Medication.objects.filter(patient=request.user, active=True)
+        .prefetch_related('dose_times'))
 
     rows = []
     for med in active_meds:
-        dose = MedicationDose.objects.filter(medication=med, date=today).first()
-        rows.append({'med': med, 'refill_in': _refill_label(med), 'dose': dose})
+        doses = list(MedicationDose.objects.filter(medication=med, date=today,
+                                                   dose_time__isnull=False)
+                     .select_related('dose_time').order_by('dose_time__at_time'))
+        rows.append({
+            'med': med,
+            'refill_in': _refill_label(med),
+            'doses': doses,
+            'dose_times': list(med.dose_times.all()),
+            'days_left': med.days_of_stock_left,
+            'low_stock': med.is_low_stock,
+        })
 
     context = {
         'rows': rows,
         'past': Medication.objects.filter(patient=request.user, active=False),
         'adherence': analytics.medication_adherence(request.user),
         'today': today,
+        'summary': alerts.today_summary(request.user),
+        'slots': DoseTime.Slot.choices,
+        'needs_review': [r for r in rows if r['med'].needs_schedule_review],
     }
     return render(request, 'health/medications.html', context)
+
+
+def _posted_dose_times(request):
+    """
+    The slots the patient set by hand on the form, as {slot: (time, qty)}.
+
+    Empty when they left the times alone, which is how the view knows to
+    fall back to reading the written schedule instead.
+    """
+    chosen = {}
+    for slot, _label in DoseTime.Slot.choices:
+        quantity = _qty(request.POST.get(f'qty_{slot}'))
+        if not quantity or quantity <= 0:
+            continue
+        raw = (request.POST.get(f'time_{slot}') or '').strip()
+        try:
+            at_time = datetime.time.fromisoformat(raw) if raw else DoseTime.DEFAULT_TIMES[slot]
+        except ValueError:
+            at_time = DoseTime.DEFAULT_TIMES[slot]
+        chosen[slot] = (at_time, quantity)
+    return chosen
+
+
+def _describe_slots(chosen):
+    """'Morning 08:00, Night 21:00' -- used as the written schedule when the
+    patient set the times by hand instead of typing one."""
+    labels = dict(DoseTime.Slot.choices)
+    ordered = [s for s, _ in DoseTime.Slot.choices if s in chosen]
+    return ', '.join(f'{labels[s]} {chosen[s][0]:%H:%M}' for s in ordered)[:120]
+
+
+def _save_dose_times(request, med, quiet=False):
+    """
+    Replace a medication's dose times from the times-of-day form.
+
+    A slot counts as "on" when its quantity is greater than zero, so
+    clearing the number is how a patient removes a dose time.
+    """
+    kept = 0
+    for slot, _label in DoseTime.Slot.choices:
+        quantity = _qty(request.POST.get(f'qty_{slot}')) or Decimal('0')
+        time_raw = (request.POST.get(f'time_{slot}') or '').strip()
+        if quantity <= 0:
+            DoseTime.objects.filter(medication=med, slot=slot).delete()
+            continue
+        try:
+            at_time = (datetime.time.fromisoformat(time_raw) if time_raw
+                       else DoseTime.DEFAULT_TIMES[slot])
+        except ValueError:
+            at_time = DoseTime.DEFAULT_TIMES[slot]
+        DoseTime.objects.update_or_create(
+            medication=med, slot=slot,
+            defaults={'at_time': at_time, 'quantity': quantity})
+        kept += 1
+
+    med.needs_schedule_review = kept == 0
+    med.save(update_fields=['needs_schedule_review'])
+    med.recompute_refill_date()
+
+    if quiet:
+        return
+    if kept:
+        messages.success(request, f'Reminder times saved for {med.name}.')
+    else:
+        messages.warning(request,
+                         f'{med.name} now has no dose times, so no reminders will be sent.')
 
 
 # --------------------------------------------------------------------------
@@ -531,7 +698,7 @@ def caregiver_dashboard(request):
     if can_vitals and latest_vital and latest_vital.status == VitalRecord.Status.HIGH:
         needs_attention.append({
             'title': 'Latest reading is high',
-            'detail': f'{latest_vital.bp_systolic}/{latest_vital.bp_diastolic} on '
+            'detail': f'{latest_vital.bp_display} on '
                       f'{latest_vital.recorded_at:%-d %b at %-I:%M %p}',
             'level': 'danger',
         })
@@ -784,70 +951,94 @@ def caregiver_requests(request):
 
 
 # --------------------------------------------------------------------------
-# Prescription extraction — process and discard
+# Document extraction — process and discard
+#
+# Two tabs, one pipeline. A prescription becomes medicines with reminders;
+# a lab report becomes measured values, and any vitals on it are routed
+# into the patient's existing vitals tracking. Neither keeps the image.
 # --------------------------------------------------------------------------
+
+def _ingest_document(request, source_type, back_to, noun):
+    """
+    Read one uploaded image, OCR it, discard the bytes, and record the job.
+
+    Shared by the prescription and lab-report uploads. Both make the same
+    process-and-discard promise, and duplicating it would mean two places
+    where the file could accidentally start being kept.
+
+    Returns `(job, text, None)` on success, or `(None, None, response)` when
+    the caller should return that redirect instead.
+    """
+    uploaded = request.FILES.get('document')
+    consented = bool(request.POST.get('consent'))
+
+    if not uploaded:
+        messages.error(request, f'Choose a photo of your {noun} first.')
+        return None, None, redirect(back_to)
+
+    # Consent gate. Refusals are logged too, so the audit trail shows
+    # attempted-but-refused processing, not just what succeeded.
+    if not consented:
+        AuditLog.record(request.user, 'Refused consent for document extraction',
+                        uploaded.name[:100], AuditLog.Tag.WARN)
+        messages.error(request,
+                       f'We can only read your {noun} if you tick the box to allow it.')
+        return None, None, redirect(back_to)
+
+    # Keep the display name before we release the upload object. We store
+    # the bare filename only -- never a path, and never the file itself.
+    display_name = uploaded.name[:255]
+
+    try:
+        extraction.validate_upload(uploaded)
+        file_bytes = uploaded.read()          # into memory, never to disk
+        text, confidence = extraction.extract_text(file_bytes, display_name)
+    except extraction.ExtractionError as exc:
+        AuditLog.record(request.user, 'Document extraction failed',
+                        str(exc)[:150], AuditLog.Tag.WARN)
+        messages.error(request, str(exc))
+        return None, None, redirect(back_to)
+    finally:
+        # Release the bytes as early as possible, whatever happened.
+        file_bytes = None
+        uploaded = None
+
+    job = ExtractionJob.objects.create(
+        patient=request.user,
+        source_type=source_type,
+        original_filename=display_name,
+        raw_text=text,
+        ocr_confidence=confidence,
+        file_deleted_at=timezone.now(),       # the bytes are already gone
+    )
+
+    if not text.strip():
+        job.status = ExtractionJob.Status.FAILED
+        job.parser_note = 'No readable text found in the image.'
+        job.save(update_fields=['status', 'parser_note'])
+        messages.error(request,
+                       "We couldn't read any text in that image. Try a sharper, "
+                       'better-lit photo taken straight on.')
+        return None, None, redirect(back_to)
+
+    return job, text, None
+
 
 @role_required(User.Role.PATIENT)
 def prescription_upload(request):
     """
     Read an uploaded prescription, extract the medicines, and discard the file.
 
-    The uploaded bytes are held in memory only. Settings force Django's
-    in-memory upload handler so a large file cannot be spilled to a temp file,
-    and nothing here ever calls save() on the upload.
+    Prescriptions only. Lab reports have their own tab, because what is done
+    with the two is completely different -- one becomes medicines with
+    reminders, the other becomes measured values and vitals.
     """
     if request.method == 'POST':
-        uploaded = request.FILES.get('document')
-        consented = bool(request.POST.get('consent'))
-
-        if not uploaded:
-            messages.error(request, 'Choose a photo of your prescription first.')
-            return redirect('health_prescription_upload')
-
-        # Consent gate. Refusals are logged too, so the audit trail shows
-        # attempted-but-refused processing, not just what succeeded.
-        if not consented:
-            AuditLog.record(request.user, 'Refused consent for document extraction',
-                            uploaded.name[:100], AuditLog.Tag.WARN)
-            messages.error(request,
-                           'We can only read your prescription if you tick the box to allow it.')
-            return redirect('health_prescription_upload')
-
-        # Keep the display name before we release the upload object. We store
-        # the bare filename only -- never a path, and never the file itself.
-        display_name = uploaded.name[:255]
-
-        try:
-            extraction.validate_upload(uploaded)
-            file_bytes = uploaded.read()          # into memory, never to disk
-            text, confidence = extraction.extract_text(file_bytes, display_name)
-        except extraction.ExtractionError as exc:
-            AuditLog.record(request.user, 'Document extraction failed',
-                            str(exc)[:150], AuditLog.Tag.WARN)
-            messages.error(request, str(exc))
-            return redirect('health_prescription_upload')
-        finally:
-            # Release the bytes as early as possible, whatever happened.
-            file_bytes = None
-            uploaded = None
-
-        job = ExtractionJob.objects.create(
-            patient=request.user,
-            source_type=request.POST.get('source_type', ExtractionJob.Source.PRESCRIPTION),
-            original_filename=display_name,
-            raw_text=text,
-            ocr_confidence=confidence,
-            file_deleted_at=timezone.now(),       # the bytes are already gone
-        )
-
-        if not text.strip():
-            job.status = ExtractionJob.Status.FAILED
-            job.parser_note = 'No readable text found in the image.'
-            job.save(update_fields=['status', 'parser_note'])
-            messages.error(request,
-                           "We couldn't read any text in that image. Try a sharper, "
-                           'better-lit photo taken straight on.')
-            return redirect('health_prescription_upload')
+        job, text, bounce = _ingest_document(
+            request, ExtractionJob.Source.PRESCRIPTION,
+            'health_prescription_upload', 'prescription')
+        if bounce:
+            return bounce
 
         items, parser_used, note = extraction.parse_medications(text)
         job.parser_used = parser_used
@@ -870,8 +1061,270 @@ def prescription_upload(request):
     return render(request, 'health/prescription_upload.html', {
         'llm_in_use': extraction.llm_available(),
         'llm_model': getattr(settings, 'LLM_MODEL', ''),
-        'recent': ExtractionJob.objects.filter(patient=request.user)[:5],
+        'recent': ExtractionJob.objects.filter(
+            patient=request.user,
+            source_type=ExtractionJob.Source.PRESCRIPTION)[:5],
     })
+
+
+# --------------------------------------------------------------------------
+# Lab reports — their own tab
+# --------------------------------------------------------------------------
+
+@role_required(User.Role.PATIENT)
+def lab_report_upload(request):
+    """
+    Read an uploaded lab report, extract the measured values, discard the file.
+
+    Same process-and-discard pipeline as a prescription; what differs is
+    where the values land afterwards.
+    """
+    if request.method == 'POST':
+        job, text, bounce = _ingest_document(
+            request, ExtractionJob.Source.LAB_REPORT,
+            'health_lab_upload', 'lab report')
+        if bounce:
+            return bounce
+
+        items, parser_used, note = labvalues.parse_lab_values(text)
+        job.parser_used = parser_used
+        job.parser_note = note[:200]
+        job.save(update_fields=['parser_used', 'parser_note'])
+
+        for item in items:
+            ExtractedLabValue.objects.create(job=job, **item)
+
+        vitals_found = sum(1 for i in items if i['vital_field'])
+        AuditLog.record(request.user, 'Extracted a lab report',
+                        f'{len(items)} value(s) found, {vitals_found} vital(s), '
+                        f'parser={parser_used}', AuditLog.Tag.OK)
+
+        if not items:
+            messages.warning(request,
+                             'We read the image but could not identify any results. '
+                             'You can enter them by hand instead.')
+        return redirect('health_lab_verify', job_id=job.id)
+
+    context = {
+        'llm_in_use': extraction.llm_available(),
+        'llm_model': getattr(settings, 'LLM_MODEL', ''),
+        'recent': ExtractionJob.objects.filter(
+            patient=request.user, source_type=ExtractionJob.Source.LAB_REPORT)[:5],
+    }
+    # Upload and history are one page, not two tabs. Splitting them meant a
+    # patient had to know in advance whether they wanted to add a report or
+    # look at one, which is not how anyone thinks about it.
+    context.update(_lab_history(request.user))
+    return render(request, 'health/lab_upload.html', context)
+
+
+def _lab_history(patient):
+    """Saved reports, per-analyte trends, and anything out of range."""
+    reports = (LabReport.objects.filter(patient=patient)
+               .prefetch_related('values').select_related('vitals_record'))
+
+    # A per-analyte trend, so a value read off a report can be compared with
+    # the same value on an earlier one rather than sitting in isolation.
+    trends = {}
+    for report in reports:
+        for value in report.values.all():
+            trends.setdefault(value.analyte, []).append((report.reported_on, value))
+    tracked = sorted(
+        ((name, sorted(rows, key=lambda r: r[0], reverse=True))
+         for name, rows in trends.items() if len(rows) > 1),
+        key=lambda pair: pair[0])
+
+    return {
+        'reports': reports,
+        'tracked': tracked,
+        'abnormal': [v for r in reports for v in r.values.all() if v.is_abnormal][:10],
+    }
+
+
+@role_required(User.Role.PATIENT)
+def lab_report_verify(request, job_id):
+    """
+    The patient checks the values before anything is saved.
+
+    On confirmation the values split two ways, and the split is the whole
+    point of this screen: anything tagged with a `vital_field` is written
+    to `VitalRecord` so it joins the existing trend charts, and everything
+    else is kept as `LabResultValue` rows on a `LabReport`.
+    """
+    job = get_object_or_404(ExtractionJob, pk=job_id, patient=request.user,
+                            source_type=ExtractionJob.Source.LAB_REPORT)
+
+    if request.method == 'POST':
+        if request.POST.get('action') == 'discard':
+            job.status = ExtractionJob.Status.DISCARDED
+            job.save(update_fields=['status'])
+            job.clear_text()
+            AuditLog.record(request.user, 'Discarded a lab extraction', '', AuditLog.Tag.MUTED)
+            messages.info(request, 'Discarded. Nothing was saved.')
+            return redirect('health_lab_upload')
+
+        reported_on = _to_date_or_today(request.POST.get('reported_on'))
+        vitals = {}
+        lab_rows = []
+        unusable_bp = []
+
+        for item in job.lab_values.all():
+            if not request.POST.get(f'keep_{item.id}'):
+                continue
+            analyte = request.POST.get(f'analyte_{item.id}', '').strip()
+            value = request.POST.get(f'value_{item.id}', '').strip()
+            if not (analyte and value):
+                continue
+
+            item.analyte = analyte[:120]
+            item.value = value[:40]
+            item.unit = request.POST.get(f'unit_{item.id}', '').strip()[:30]
+            item.reference_range = request.POST.get(f'range_{item.id}', '').strip()[:60]
+            # The patient may have corrected the name into (or out of) being
+            # a vital, so where it goes is decided from what they confirmed,
+            # not from what the parser first guessed.
+            item.vital_field = labvalues.vital_field_for(item.analyte)
+            item.flag = item.flag or LabResultValue.Flag.UNKNOWN
+            item.confirmed = True
+            item.save()
+
+            if item.vital_field == 'bp':
+                # An unsplit blood pressure. If the patient has typed it as
+                # "130/85" we can use it; if they left OCR's mangled version
+                # in place we say so rather than guessing where the slash
+                # went, or quietly filing it as a lab result.
+                pair = labvalues.split_bp(item.value)
+                if pair:
+                    vitals['bp_systolic'], vitals['bp_diastolic'] = pair
+                else:
+                    unusable_bp.append(item.value)
+            elif item.vital_field:
+                vitals[item.vital_field] = item.value
+            else:
+                lab_rows.append(item)
+
+        vital_record = _vital_from_lab(request.user, vitals, reported_on)
+
+        report = None
+        if lab_rows:
+            report = LabReport.objects.create(
+                patient=request.user, reported_on=reported_on,
+                lab_name=request.POST.get('lab_name', '').strip()[:150],
+                note=request.POST.get('note', '').strip()[:255],
+                vitals_record=vital_record,
+            )
+            for item in lab_rows:
+                LabResultValue.objects.create(
+                    report=report, analyte=item.analyte, value=item.value,
+                    unit=item.unit, reference_range=item.reference_range,
+                    flag=item.flag,
+                )
+
+        job.status = ExtractionJob.Status.CONFIRMED
+        job.save(update_fields=['status'])
+        job.clear_text()        # transcribed text is no longer needed
+        AuditLog.record(request.user, 'Confirmed lab report values',
+                        f'{len(lab_rows)} result(s), '
+                        f'{"vitals updated" if vital_record else "no vitals"}',
+                        AuditLog.Tag.OK)
+
+        if vital_record:
+            analytics.generate_insights(request.user)
+            messages.success(
+                request,
+                f'{len(vitals)} reading{"s" if len(vitals) != 1 else ""} added to your '
+                'vitals tracking.')
+        if lab_rows:
+            messages.success(
+                request,
+                f'{len(lab_rows)} lab result{"s" if len(lab_rows) != 1 else ""} saved.')
+        if unusable_bp:
+            messages.warning(
+                request,
+                f'We could not read the blood pressure ("{unusable_bp[0]}"), so it was not saved. '
+                'Blood pressure needs to be written as two numbers with a slash, like 130/85 — '
+                'upload again and correct it, or add it on the Log Vitals page.')
+        if not (vital_record or lab_rows):
+            messages.info(request, 'Nothing was saved.')
+
+        return redirect('health_lab_upload' if lab_rows else 'health_vitals')
+
+    items = list(job.lab_values.all())
+    return render(request, 'health/lab_verify.html', {
+        'job': job,
+        'vital_items': [i for i in items if i.is_vital],
+        'other_items': [i for i in items if not i.is_vital],
+        # A blood pressure OCR could not split needs retyping as 130/85.
+        'unsplit_bp': [i for i in items
+                       if i.vital_field == 'bp' and not labvalues.split_bp(i.value)],
+        'today': timezone.localdate(),
+        'vital_labels': labvalues.VITAL_LABELS,
+    })
+
+
+@role_required(User.Role.PATIENT)
+def lab_results(request):
+    """
+    Kept so older links and bookmarks still work.
+
+    Uploading and reviewing now live on one page, so this only forwards.
+    """
+    return redirect('health_lab_upload')
+
+
+def _to_date_or_today(raw):
+    raw = (raw or '').strip()
+    if not raw:
+        return timezone.localdate()
+    try:
+        return datetime.date.fromisoformat(raw)
+    except ValueError:
+        return timezone.localdate()
+
+
+def _vital_from_lab(patient, values, on_date):
+    """
+    Write the vitals found on a lab report into `VitalRecord`.
+
+    Returns the record, or None when the report carried no vitals at all.
+    The reading is tagged `LAB_REPORT` so its provenance stays visible next
+    to self-recorded and nurse-recorded readings, and only the fields the
+    report actually contained are set -- the rest stay empty rather than
+    being invented.
+    """
+    if not values:
+        return None
+
+    def as_int(raw):
+        try:
+            return int(round(float(str(raw).replace(',', ''))))
+        except (TypeError, ValueError):
+            return None
+
+    def as_decimal(raw):
+        try:
+            return Decimal(str(raw).replace(',', ''))
+        except (InvalidOperation, ValueError, TypeError):
+            return None
+
+    record = VitalRecord(
+        patient=patient,
+        recorded_at=timezone.make_aware(
+            datetime.datetime.combine(on_date, datetime.time(9, 0)),
+            timezone.get_current_timezone()),
+        source=VitalRecord.Source.LAB_REPORT,
+        bp_systolic=as_int(values.get('bp_systolic')),
+        bp_diastolic=as_int(values.get('bp_diastolic')),
+        blood_sugar=as_decimal(values.get('blood_sugar')),
+        weight_kg=as_decimal(values.get('weight_kg')),
+        heart_rate=as_int(values.get('heart_rate')),
+    )
+    # A record where every field failed to parse is not worth keeping.
+    if not any([record.bp_systolic, record.bp_diastolic, record.blood_sugar,
+                record.weight_kg, record.heart_rate]):
+        return None
+    record.save()
+    return record
 
 
 @role_required(User.Role.PATIENT)
@@ -891,6 +1344,7 @@ def extraction_verify(request, job_id):
             return redirect('health_prescription_upload')
 
         created = 0
+        unreadable = []
         for item in job.medications.all():
             if not request.POST.get(f'keep_{item.id}'):
                 continue
@@ -900,15 +1354,38 @@ def extraction_verify(request, job_id):
             item.name = name[:120]
             item.dose = request.POST.get(f'dose_{item.id}', '').strip()[:60]
             item.frequency = request.POST.get(f'frequency_{item.id}', '').strip()[:120]
+            item.duration = request.POST.get(f'duration_{item.id}', item.duration).strip()[:60]
             item.confirmed = True
-            item.save(update_fields=['name', 'dose', 'frequency', 'confirmed'])
+            item.save(update_fields=['name', 'dose', 'frequency', 'duration', 'confirmed'])
 
-            Medication.objects.create(
+            # The course length and the quantity dispensed are what make a
+            # restock warning possible, so they are carried across here
+            # rather than being dropped with the rest of the extraction.
+            duration_days = schedules.parse_duration_days(item.duration)
+            quantity = _qty(request.POST.get(f'quantity_{item.id}'))
+
+            med = Medication.objects.create(
                 patient=request.user, name=item.name,
                 dose=item.dose or 'As prescribed',
                 schedule=item.frequency or 'As prescribed',
                 start_date=timezone.localdate(),
+                duration_days=duration_days,
+                quantity_dispensed=quantity,
+                stock_on_hand=quantity,
             )
+            parsed = med.set_schedule_from_text()
+
+            # If the patient told us the course length but not how many
+            # tablets they were given, we can work it out.
+            if quantity is None and duration_days and parsed.daily_quantity > 0:
+                supply = parsed.daily_quantity * duration_days
+                med.quantity_dispensed = supply
+                med.stock_on_hand = supply
+                med.save(update_fields=['quantity_dispensed', 'stock_on_hand'])
+
+            med.recompute_refill_date()
+            if med.needs_schedule_review:
+                unreadable.append(med.name)
             created += 1
 
         job.status = ExtractionJob.Status.CONFIRMED
@@ -920,6 +1397,11 @@ def extraction_verify(request, job_id):
         if created:
             messages.success(request,
                              f'{created} medicine{"s" if created != 1 else ""} added.')
+            if unreadable:
+                messages.warning(
+                    request,
+                    'We could not work out reminder times for '
+                    f'{", ".join(unreadable)}. Set them on this page so alerts can be sent.')
         else:
             messages.info(request, 'Nothing was added.')
         return redirect('health_medications')

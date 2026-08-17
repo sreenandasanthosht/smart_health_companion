@@ -30,7 +30,10 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_CONTENT_TYPES = {'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/bmp', 'image/tiff'}
+ALLOWED_CONTENT_TYPES = {'image/jpeg', 'image/jpg', 'image/png', 'image/webp',
+                         'image/bmp', 'image/tiff', 'application/pdf'}
+
+PDF_MAGIC = b'%PDF-'
 
 
 class ExtractionError(Exception):
@@ -43,13 +46,68 @@ class ExtractionError(Exception):
 
 def extract_text(file_bytes, filename=''):
     """
-    Run Tesseract over the image bytes and return (text, mean_confidence).
+    Turn an uploaded document into text, and return (text, confidence).
+
+    A PDF is read directly -- its text is already in the file, so there is
+    nothing to recognise and nothing to get wrong. Only an image needs OCR.
+    Most labs email PDFs, and taking a photo of one on screen throws away
+    perfect text in order to guess at it again, so the PDF path is always
+    preferred where it is available.
 
     The bytes stay in memory throughout. Nothing is written to disk.
     """
+    if file_bytes[:5] == PDF_MAGIC:
+        return _extract_pdf_text(file_bytes)
+    return _extract_image_text(file_bytes)
+
+
+def _extract_pdf_text(file_bytes):
+    """
+    Read the text layer out of a PDF. Exact, so confidence is 100.
+
+    A scanned PDF -- a photo wrapped in a PDF container -- has no text
+    layer, and is reported as such rather than silently returning nothing.
+    """
+    try:
+        import pdfplumber
+    except ImportError as exc:                                  # pragma: no cover
+        raise ExtractionError(
+            'PDF support is not installed. Run: python -m pip install pdfplumber '
+            '— or take a photo of the report and upload that instead.'
+        ) from exc
+
+    try:
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            # Lab reports are one or two pages; a cap keeps a mistakenly
+            # uploaded 200-page document from hanging the request.
+            pages = [page.extract_text() or '' for page in pdf.pages[:5]]
+    except Exception as exc:
+        raise ExtractionError(
+            "We couldn't read that PDF. Try a photo of the report instead."
+        ) from exc
+
+    text = '\n'.join(p for p in pages if p.strip())
+    if not text.strip():
+        raise ExtractionError(
+            'That PDF has no text in it — it looks like a scan. '
+            'Upload it as a JPG or PNG photo instead so we can read it.')
+    # Not a guess: this text was read, not recognised.
+    return text, 100.0
+
+
+def _extract_image_text(file_bytes):
+    """
+    Run Tesseract over image bytes and return (text, mean_confidence).
+
+    The image is prepared before recognition. Untouched phone photos read
+    badly on printed tables: too small for Tesseract's default assumptions,
+    and low-contrast under room light. Upscaling and stretching contrast
+    costs a fraction of a second and is the difference between "134.19" and
+    "13419".
+    """
     try:
         import pytesseract
-        from PIL import Image, UnidentifiedImageError
+        from PIL import Image, ImageOps, UnidentifiedImageError
     except ImportError as exc:                                  # pragma: no cover
         raise ExtractionError(
             'The OCR libraries are not installed. Run: pip install pytesseract Pillow'
@@ -63,16 +121,19 @@ def extract_text(file_bytes, filename=''):
         image.load()
     except UnidentifiedImageError as exc:
         raise ExtractionError(
-            "That file doesn't look like an image we can read. "
-            'Please upload a JPG or PNG photo of the prescription.'
+            "That file doesn't look like something we can read. "
+            'Please upload a JPG or PNG photo, or the original PDF.'
         ) from exc
 
-    # Greyscale helps Tesseract on phone photos of printed text.
-    if image.mode not in ('L', 'RGB'):
-        image = image.convert('RGB')
+    image = _prepare_for_ocr(image, ImageOps)
 
     try:
-        data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
+        # PSM 6 -- "a single uniform block of text". The default (3) runs
+        # full page-layout analysis, which on a results table hunts for
+        # columns and routinely splits or merges them in the wrong places.
+        # A lab report and a prescription are both, structurally, one block.
+        data = pytesseract.image_to_data(
+            image, config='--psm 6', output_type=pytesseract.Output.DICT)
     except Exception as exc:
         raise ExtractionError(
             'Could not read the image. Check that Tesseract is installed and that '
@@ -108,6 +169,39 @@ def extract_text(file_bytes, filename=''):
     text = '\n'.join(ln for ln in lines if ln.strip())
     mean_conf = round(sum(confidences) / len(confidences), 1) if confidences else 0.0
     return text, mean_conf
+
+
+# Below this width Tesseract struggles with printed tables; above it there
+# is nothing left to gain and the recognition just takes longer.
+OCR_TARGET_WIDTH = 2000
+OCR_MAX_WIDTH = 3500
+
+
+def _prepare_for_ocr(image, ImageOps):
+    """
+    Greyscale, upscale and stretch contrast before recognition.
+
+    Each step is cheap and each fixes a specific, observed failure:
+      * greyscale   -- colour tells Tesseract nothing about printed text
+      * upscale     -- small text is where digits get merged ("134.19" read
+                       as "13419"); Tesseract wants roughly 300 DPI
+      * autocontrast -- a photo taken under room light is grey-on-grey, and
+                        stretching the range separates ink from paper
+    """
+    image = image.convert('L')
+
+    width, height = image.size
+    if 0 < width < OCR_TARGET_WIDTH:
+        from PIL import Image as PILImage
+
+        scale = min(OCR_TARGET_WIDTH / width, OCR_MAX_WIDTH / max(width, 1))
+        # Pillow 10 moved the resampling constants; support both.
+        lanczos = getattr(getattr(PILImage, 'Resampling', PILImage), 'LANCZOS')
+        image = image.resize((int(width * scale), int(height * scale)), lanczos)
+
+    # Ignore the extreme 2% at each end so one dark speck or a bright glare
+    # spot cannot flatten the whole image.
+    return ImageOps.autocontrast(image, cutoff=2)
 
 
 # ---------------------------------------------------------------------------
@@ -286,12 +380,15 @@ def llm_available():
     return bool(getattr(settings, 'LLM_API_KEY', ''))
 
 
-def parse_medications_llm(text):
+def call_gemini(prompt, schema):
     """
-    Ask the configured LLM to structure the OCR text.
+    Send a prompt to Gemini and return the parsed JSON object it replies with.
 
-    Raises ExtractionError on any failure so the caller can fall back to the
-    rule-based parser rather than showing the patient an error.
+    Shared by the prescription and lab-report parsers -- only the prompt and
+    the schema differ, and duplicating the transport would mean fixing every
+    timeout and error-handling bug twice.
+
+    Only TEXT is ever sent. The uploaded image never leaves this computer.
     """
     if not llm_available():
         raise ExtractionError('No LLM API key configured.')
@@ -304,10 +401,10 @@ def parse_medications_llm(text):
     url = (f'https://generativelanguage.googleapis.com/v1beta/models/'
            f'{model}:generateContent?key={settings.LLM_API_KEY}')
     payload = {
-        'contents': [{'parts': [{'text': LLM_PROMPT.format(text=text[:8000])}]}],
+        'contents': [{'parts': [{'text': prompt}]}],
         'generationConfig': {
             'responseMimeType': 'application/json',
-            'responseSchema': GEMINI_SCHEMA,
+            'responseSchema': schema,
             'temperature': 0.0,
         },
     }
@@ -326,8 +423,22 @@ def parse_medications_llm(text):
 
     try:
         raw = body['candidates'][0]['content']['parts'][0]['text']
-        items = json.loads(raw)['medications']
+        return json.loads(raw)
     except (KeyError, IndexError, ValueError, TypeError) as exc:
+        raise ExtractionError('LLM response was not in the expected format.') from exc
+
+
+def parse_medications_llm(text):
+    """
+    Ask the configured LLM to structure the OCR text.
+
+    Raises ExtractionError on any failure so the caller can fall back to the
+    rule-based parser rather than showing the patient an error.
+    """
+    body = call_gemini(LLM_PROMPT.format(text=text[:8000]), GEMINI_SCHEMA)
+    try:
+        items = body['medications']
+    except (KeyError, TypeError) as exc:
         raise ExtractionError('LLM response was not in the expected format.') from exc
 
     cleaned = []

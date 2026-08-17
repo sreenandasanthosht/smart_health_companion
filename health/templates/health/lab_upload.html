@@ -1,0 +1,176 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Upload Lab Report &middot; CareNest{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar.html' with active='lab' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Patient</span>
+        <h1>Upload a lab report</h1>
+        <div class="page-sub">We read the results off it. Anything that's a vital sign goes into your
+        vitals tracking; everything else is saved as a lab result you can compare over time.</div>
+      </div>
+
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warn{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
+
+      <div class="grid g-7-5">
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-flask"/></svg> Choose a photo</h3>
+
+          <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="field">
+              <label>Lab report</label>
+              <input type="file" name="document" class="inp" accept="image/*,application/pdf" required>
+              <div class="hint">A PDF, or a JPG/PNG photo, up to 15 MB. <b>A PDF reads far more accurately</b> — the text is already in the file, so nothing has to be recognised. Take it straight on, in good light.
+              A flat scan of the results table reads best.</div>
+            </div>
+
+            <div class="callout info" style="margin-bottom:16px;">
+              <svg class="ic"><use href="#i-pill"/></svg>
+              <div class="c-body">Got a <b>prescription</b> instead? Use the
+                <a href="{% url 'health_prescription_upload' %}">Upload Prescription</a> tab &mdash;
+                those become medicines with reminders.</div>
+            </div>
+
+            <div class="callout muted" style="margin-bottom:16px;">
+              <svg class="ic"><use href="#i-shield-alert"/></svg>
+              <div class="c-body">
+                <strong>What happens to your report.</strong>
+                We read the text from it on this computer, then the photo is
+                gone &mdash; it is never saved anywhere.
+                {% if llm_in_use %}
+                The <em>text</em> we read is sent to Google Gemini to work out the
+                test names and values, and is not kept by them for training.
+                Your photo is never sent.
+                {% else %}
+                The text is processed on this computer too. Nothing is sent anywhere.
+                {% endif %}
+                Only the values you confirm are kept.
+              </div>
+            </div>
+
+            <div class="field">
+              <label style="display:flex;align-items:flex-start;gap:11px;font-weight:600;line-height:1.5;">
+                <input type="checkbox" name="consent" value="1" style="margin-top:3px;width:20px;height:20px;flex:0 0 20px;">
+                <span>Yes, read this photo{% if llm_in_use %} and send the text it contains to Gemini to be understood{% endif %}. I know the photo itself is deleted straight away and never stored.</span>
+              </label>
+            </div>
+
+            <button type="submit" class="btn btn-teal block">Read my lab report</button>
+          </form>
+        </div></div>
+
+        <div>
+          <div class="panel" style="margin-bottom:20px;"><div class="p-body">
+            <h3 class="p-h"><svg class="ic"><use href="#i-sparkles"/></svg> How this works</h3>
+            <div class="kv"><span class="k">1. You upload a photo</span><span class="v">Held in memory only</span></div>
+            <div class="kv"><span class="k">2. We read the text</span><span class="v">On this computer</span></div>
+            <div class="kv"><span class="k">3. The photo is discarded</span><span class="v">Before the page loads</span></div>
+            <div class="kv"><span class="k">4. You check what we found</span><span class="v">Nothing saved yet</span></div>
+            <div class="kv"><span class="k">5. You confirm</span><span class="v">Only then is it saved</span></div>
+
+            <div class="callout muted" style="margin-top:14px;margin-bottom:0;">
+              <svg class="ic"><use href="#i-heart-pulse"/></svg>
+              <div class="c-body"><b>Where results go.</b> Blood pressure, blood sugar, weight and
+              pulse are added to your <b>vitals</b>, so they appear on your existing trend charts.
+              Everything else &mdash; haemoglobin, cholesterol, creatinine and so on &mdash; is saved
+              below.</div>
+            </div>
+          </div></div>
+
+          {% if recent %}
+          <div class="panel"><div class="p-body">
+            <h3 class="p-h"><svg class="ic"><use href="#i-clock"/></svg> Recent uploads</h3>
+            {% for j in recent %}
+            <div class="kv">
+              <span class="k">{{ j.original_filename|truncatechars:28 }}</span>
+              <span class="v"><span class="pill {% if j.status == 'CONFIRMED' %}ok{% elif j.status == 'FAILED' %}danger{% else %}muted{% endif %}">{{ j.get_status_display }}</span></span>
+            </div>
+            {% endfor %}
+            <p class="s" style="margin-top:8px;">Only the filename and outcome are kept. The images
+            themselves were discarded when they were read.</p>
+          </div></div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="page-head" style="margin-top:34px;">
+        <h1 style="font-size:22px;">My saved results</h1>
+        <div class="page-sub">Values you've confirmed. Vitals from these same reports live on your
+        <a href="{% url 'health_vitals' %}">vitals page</a> instead.</div>
+      </div>
+
+      {% if abnormal %}
+      <div class="callout warn">
+        <svg class="ic"><use href="#i-shield-alert"/></svg>
+        <div class="c-body"><strong>{{ abnormal|length }} result{{ abnormal|length|pluralize }} outside the
+        normal range.</strong> Worth showing your doctor &mdash; CareNest doesn't interpret results.</div>
+      </div>
+      {% endif %}
+
+      {% if tracked %}
+      <div class="panel" style="margin-bottom:20px;"><div class="p-body">
+        <h3 class="p-h"><svg class="ic"><use href="#i-activity"/></svg> Tests you've had more than once</h3>
+        <p class="s" style="margin-bottom:12px;">Newest first, so you can see which way a value is moving.</p>
+        {% for name, rows in tracked %}
+        <div class="lrow" style="flex-direction:column;align-items:stretch;gap:6px;">
+          <div class="t">{{ name }}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            {% for on_date, v in rows %}
+            <span class="pill {% if v.flag == 'NORMAL' %}ok{% elif v.flag == 'HIGH' %}danger{% elif v.flag == 'LOW' %}warn{% else %}muted{% endif %}">
+              {{ v.value }} {{ v.unit }} &middot; {{ on_date|date:"j M y" }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div></div>
+      {% endif %}
+
+      {% for report in reports %}
+      <div class="panel" style="margin-bottom:20px;"><div class="p-body">
+        <h3 class="p-h"><svg class="ic"><use href="#i-flask"/></svg>
+          {{ report.reported_on|date:"j M Y" }}{% if report.lab_name %} &middot; {{ report.lab_name }}{% endif %}
+          {% if report.abnormal_count %}<span class="pill warn">{{ report.abnormal_count }} flagged</span>{% endif %}</h3>
+        {% if report.note %}<p class="s" style="margin-bottom:10px;">{{ report.note }}</p>{% endif %}
+
+        <table class="dtable">
+          <thead><tr><th>Test</th><th>Value</th><th>Normal range</th><th>Reading</th></tr></thead>
+          <tbody>
+          {% for v in report.values.all %}
+            <tr>
+              <td><b>{{ v.analyte }}</b></td>
+              <td>{{ v.value }} {{ v.unit }}</td>
+              <td>{{ v.reference_range|default:"&mdash;" }}</td>
+              <td><span class="pill {% if v.flag == 'NORMAL' %}ok{% elif v.flag == 'HIGH' %}danger{% elif v.flag == 'LOW' %}warn{% else %}muted{% endif %}">{{ v.get_flag_display }}</span></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" style="color:var(--muted);">No lab values on this report.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+
+        {% if report.vitals_record %}
+        <p class="s" style="margin-top:10px;">Vitals from this report were added to your vitals
+        tracking on {{ report.vitals_record.recorded_at|date:"j M Y" }} &mdash;
+        <a href="{% url 'health_vitals' %}">see them there</a>.</p>
+        {% endif %}
+      </div></div>
+      {% empty %}
+      <div class="panel" style="margin-bottom:20px;"><div class="p-body">
+        <p style="color:var(--muted);font-size:13.5px;margin:0;">Nothing saved yet. Upload a report
+        above and confirm the values, and they'll appear here.</p>
+      </div></div>
+      {% endfor %}
+
+      <div class="callout muted">
+        <svg class="ic"><use href="#i-shield-alert"/></svg>
+        <div class="c-body">Only the values are stored &mdash; the report images were discarded when
+        they were read. CareNest records what your report said; it does not interpret it.</div>
+      </div>
+
+{% endblock %}

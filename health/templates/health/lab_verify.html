@@ -1,0 +1,143 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Check your results &middot; CareNest{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar.html' with active='lab' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Patient</span>
+        <h1>Check what we found</h1>
+        <div class="page-sub">Correct anything that's wrong, untick anything that isn't a result,
+        then confirm. Nothing has been saved yet.</div>
+      </div>
+
+      {% for message in messages %}
+      <div class="callout {% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warn{% else %}info{% endif %}">
+        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      </div>
+      {% endfor %}
+
+      <div class="callout mint">
+        <svg class="ic"><use href="#i-check"/></svg>
+        <div class="c-body"><strong>Your photo has already been deleted.</strong>
+          It was read at {{ job.file_deleted_at|time:"g:i A" }} and discarded immediately.
+          Only what you confirm below will be kept.</div>
+      </div>
+
+      <form method="post">
+        {% csrf_token %}
+
+        <div class="panel" style="margin-bottom:20px;"><div class="p-body">
+          <h3 class="p-h"><svg class="ic"><use href="#i-calendar"/></svg> About this report</h3>
+          <div style="display:grid;grid-template-columns:1fr 1.4fr 1.6fr;gap:10px;">
+            <div class="field" style="margin:0;"><label>Report date</label>
+              <input type="date" name="reported_on" class="inp" value="{{ today|date:'Y-m-d' }}"></div>
+            <div class="field" style="margin:0;"><label>Lab name (optional)</label>
+              <input type="text" name="lab_name" class="inp" placeholder="e.g. Prakash Diagnostics"></div>
+            <div class="field" style="margin:0;"><label>Note (optional)</label>
+              <input type="text" name="note" class="inp" placeholder="e.g. Fasting sample"></div>
+          </div>
+        </div></div>
+
+        {% if vital_items %}
+        <div class="panel" style="margin-bottom:20px;"><div class="p-body">
+          <h3 class="p-h"><svg class="ic"><use href="#i-heart-pulse"/></svg> Vitals
+            <span class="pill ok">{{ vital_items|length }}</span></h3>
+          <p class="s" style="margin-bottom:12px;">These are vital signs, so they go into your
+          <b>vitals tracking</b> and will show up on your trend charts alongside your own readings,
+          tagged as coming from a lab report.</p>
+
+          {% if unsplit_bp %}
+          <div class="callout warn" style="margin-bottom:12px;">
+            <svg class="ic"><use href="#i-shield-alert"/></svg>
+            <div class="c-body">We couldn't read the blood pressure clearly &mdash; the slash is easy
+            to lose. Please retype it as two numbers with a slash, like <b>130/85</b>, checking against
+            the report. If you leave it as it is, it won't be saved.</div>
+          </div>
+          {% endif %}
+
+          <table class="dtable">
+            <thead><tr><th style="width:52px;">Keep</th><th>Measurement</th><th>Value</th><th>Unit</th><th>Normal range</th><th>Confidence</th></tr></thead>
+            <tbody>
+            {% for item in vital_items %}
+              <tr>
+                <td><input type="checkbox" name="keep_{{ item.id }}" value="1" checked></td>
+                <td><input type="text" name="analyte_{{ item.id }}" value="{{ item.analyte }}" class="inp" style="min-width:170px;"></td>
+                <td><input type="text" name="value_{{ item.id }}" value="{{ item.value }}" class="inp" style="min-width:90px;"></td>
+                <td><input type="text" name="unit_{{ item.id }}" value="{{ item.unit }}" class="inp" style="min-width:80px;"></td>
+                <td><input type="text" name="range_{{ item.id }}" value="{{ item.reference_range }}" class="inp" style="min-width:110px;"></td>
+                <td><span class="pill {% if item.confidence_band == 'high' %}ok{% elif item.confidence_band == 'medium' %}warn{% else %}danger{% endif %}">{{ item.confidence_band|title }}</span></td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div></div>
+        {% endif %}
+
+        {% if other_items %}
+        <div class="panel" style="margin-bottom:20px;"><div class="p-body">
+          <h3 class="p-h"><svg class="ic"><use href="#i-flask"/></svg> Lab results
+            <span class="pill muted">{{ other_items|length }}</span></h3>
+          <p class="s" style="margin-bottom:12px;">These are saved on the <b>Lab Reports</b> page,
+          where you can compare them against earlier reports.</p>
+
+          <table class="dtable">
+            <thead><tr><th style="width:52px;">Keep</th><th>Test</th><th>Value</th><th>Unit</th><th>Normal range</th><th>Reading</th><th>Confidence</th></tr></thead>
+            <tbody>
+            {% for item in other_items %}
+              <tr>
+                <td><input type="checkbox" name="keep_{{ item.id }}" value="1" checked></td>
+                <td><input type="text" name="analyte_{{ item.id }}" value="{{ item.analyte }}" class="inp" style="min-width:170px;"></td>
+                <td><input type="text" name="value_{{ item.id }}" value="{{ item.value }}" class="inp" style="min-width:90px;"></td>
+                <td><input type="text" name="unit_{{ item.id }}" value="{{ item.unit }}" class="inp" style="min-width:80px;"></td>
+                <td><input type="text" name="range_{{ item.id }}" value="{{ item.reference_range }}" class="inp" style="min-width:110px;"></td>
+                <td><span class="pill {% if item.flag == 'NORMAL' %}ok{% elif item.flag == 'HIGH' %}danger{% elif item.flag == 'LOW' %}warn{% else %}muted{% endif %}">{{ item.get_flag_display }}</span></td>
+                <td><span class="pill {% if item.confidence_band == 'high' %}ok{% elif item.confidence_band == 'medium' %}warn{% else %}danger{% endif %}">{{ item.confidence_band|title }}</span></td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div></div>
+        {% endif %}
+
+        {% if not vital_items and not other_items %}
+        <div class="callout warn">
+          <svg class="ic"><use href="#i-shield-alert"/></svg>
+          <div class="c-body">We couldn't identify any results in that image. Try a sharper photo of
+          the results table, or enter your readings directly on the
+          <a href="{% url 'health_vitals' %}">Log Vitals</a> page.</div>
+        </div>
+        {% endif %}
+
+        <div style="display:flex;gap:10px;margin-bottom:22px;">
+          <button type="submit" class="btn btn-teal" style="padding:12px 20px;">
+            <svg class="ic"><use href="#i-check"/></svg> Confirm and save</button>
+          <button type="submit" name="action" value="discard" class="btn btn-danger-ghost" style="padding:12px 20px;">
+            Discard all of this</button>
+        </div>
+      </form>
+
+      <div class="grid g-7-5">
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-file-text"/></svg> The text we read</h3>
+          <pre style="white-space:pre-wrap;font-size:12.5px;color:var(--muted);margin:0;">{{ job.raw_text|default:"(cleared)" }}</pre>
+          <p class="s" style="margin-top:10px;">This text is deleted the moment you confirm or discard.</p>
+        </div></div>
+
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-activity"/></svg> How this was read</h3>
+          <div class="kv"><span class="k">Text recognition</span><span class="v">{% if job.ocr_confidence == 100.0 %}Read from the PDF text{% else %}Tesseract, on this computer{% endif %}</span></div>
+          <div class="kv"><span class="k">Recognition quality</span><span class="v">{% if job.ocr_confidence == 100.0 %}Exact (no guessing){% else %}{{ job.ocr_confidence|floatformat:1 }}%{% endif %}</span></div>
+          <div class="kv"><span class="k">Understood by</span><span class="v">{{ job.get_parser_used_display }}</span></div>
+          <div class="kv"><span class="k">Photo deleted</span><span class="v">{{ job.file_deleted_at|time:"g:i A" }}</span></div>
+          {% if job.parser_note %}<p class="s" style="margin-top:8px;">{{ job.parser_note }}</p>{% endif %}
+
+          <div class="callout muted" style="margin-top:14px;margin-bottom:0;">
+            <svg class="ic"><use href="#i-shield-alert"/></svg>
+            <div class="c-body">Reading a report is never perfect. Check every value against the
+            paper before you confirm &mdash; especially the decimal points.</div>
+          </div>
+        </div></div>
+      </div>
+
+{% endblock %}

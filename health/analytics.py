@@ -111,7 +111,11 @@ def vital_series(patient, limit=8):
     systolic = [r.bp_systolic for r in records]
     diastolic = [r.bp_diastolic for r in records]
     bp = build(systolic, BP_SYS_NORMAL_MAX, 139)
-    bp['latest'] = f"{records[-1].bp_systolic}/{records[-1].bp_diastolic}" if records else None
+    # A lab report often carries a sugar or a weight and no blood pressure,
+    # so the newest record is not guaranteed to have one. Fall back to the
+    # newest record that actually does.
+    with_bp = [r for r in records if r.has_bp]
+    bp['latest'] = with_bp[-1].bp_display if with_bp else None
     bp['diastolic'] = diastolic
 
     return {
@@ -161,15 +165,16 @@ def generate_insights(patient, persist=True):
     vitals = _recent_vitals(patient, days=30, limit=10)
 
     # Rule 1 -- consecutive out-of-range blood pressure.
-    if len(vitals) >= 2:
-        newest_two = vitals[:2]
+    bp_vitals = [v for v in vitals if v.has_bp]
+    if len(bp_vitals) >= 2:
+        newest_two = bp_vitals[:2]
         if all(v.status == VitalRecord.Status.HIGH for v in newest_two):
-            readings = ', '.join(f"{v.bp_systolic}/{v.bp_diastolic}" for v in newest_two)
+            readings = ', '.join(v.bp_display for v in newest_two)
             add(HealthInsight.Level.CRITICAL,
                 'Blood pressure has been high on your last two readings.',
                 f"Readings: {readings} (>= 140/90 is the high threshold)")
         elif all(v.status != VitalRecord.Status.NORMAL for v in newest_two):
-            readings = ', '.join(f"{v.bp_systolic}/{v.bp_diastolic}" for v in newest_two)
+            readings = ', '.join(v.bp_display for v in newest_two)
             add(HealthInsight.Level.WARNING,
                 'Blood pressure has been trending above your normal range.',
                 f"Readings: {readings}")

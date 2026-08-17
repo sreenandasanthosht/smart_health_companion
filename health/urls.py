@@ -18,4 +18,10 @@ urlpatterns = [
 
     path('prescription/', views.prescription_upload, name='health_prescription_upload'),
     path('prescription/<int:job_id>/verify/', views.extraction_verify, name='health_extraction_verify'),
+
+    # Lab reports get their own tab: what happens to a lab report after
+    # extraction has nothing in common with what happens to a prescription.
+    path('lab-report/', views.lab_report_upload, name='health_lab_upload'),
+    path('lab-report/<int:job_id>/verify/', views.lab_report_verify, name='health_lab_verify'),
+    path('lab-results/', views.lab_results, name='health_lab_results'),
 ]

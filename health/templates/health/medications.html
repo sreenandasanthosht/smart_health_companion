@@ -7,14 +7,50 @@
       <div class="page-head">
         <span class="chip-role">Patient</span>
         <h1>Medications</h1>
-        <div class="page-sub">Manage your medicines and tick off each dose as you take it. Adherence feeds into your health score.</div>
+        <div class="page-sub">Tick off each dose as you take it. Reminders are sent at the times you set,
+        and we count your stock down so you know when to reorder.</div>
       </div>
 
       {% for message in messages %}
-      <div class="callout {% if message.tags == 'error' %}danger{% else %}info{% endif %}">
+      <div class="callout {% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warn{% else %}info{% endif %}">
         <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
       </div>
       {% endfor %}
+
+      {% if summary.missed %}
+      <div class="callout danger">
+        <svg class="ic"><use href="#i-shield-alert"/></svg>
+        <div class="c-body"><strong>{{ summary.missed|length }} dose{{ summary.missed|length|pluralize }} missed today.</strong>
+          If you did take {% if summary.missed|length == 1 %}it{% else %}them{% endif %}, tick
+          {% if summary.missed|length == 1 %}it{% else %}them{% endif %} off below.</div>
+      </div>
+      {% endif %}
+
+      {% if summary.due %}
+      <div class="callout warn">
+        <svg class="ic"><use href="#i-clock"/></svg>
+        <div class="c-body"><strong>{{ summary.due|length }} dose{{ summary.due|length|pluralize }} due now.</strong></div>
+      </div>
+      {% endif %}
+
+      {% if summary.low_stock %}
+      <div class="callout warn">
+        <svg class="ic"><use href="#i-pill"/></svg>
+        <div class="c-body"><strong>Running low:</strong>
+          {% for m in summary.low_stock %}{{ m.name }}{% if not forloop.last %}, {% endif %}{% endfor %}.
+          Arrange a refill before you run out.</div>
+      </div>
+      {% endif %}
+
+      {% if needs_review %}
+      <div class="callout muted">
+        <svg class="ic"><use href="#i-shield-alert"/></svg>
+        <div class="c-body">We could not read the times for
+          {% for r in needs_review %}<b>{{ r.med.name }}</b>{% if not forloop.last %}, {% endif %}{% endfor %}.
+          No reminders are being sent for {% if needs_review|length == 1 %}it{% else %}them{% endif %} until you
+          set the times below &mdash; we would rather ask than guess and remind you at the wrong hour.</div>
+      </div>
+      {% endif %}
 
       {% if adherence is not None %}
       <div class="callout {% if adherence >= 80 %}mint{% else %}warn{% endif %}">
@@ -27,28 +63,101 @@
         <div>
           <div class="panel" style="margin-bottom:20px;"><div class="p-body tall">
             <h3 class="p-h"><svg class="ic"><use href="#i-pill"/></svg> Active medicines &mdash; today ({{ today|date:"j M" }})</h3>
+
             {% for row in rows %}
-            <div class="lrow">
-              <span class="ri {% if row.dose.taken %}tint-green{% else %}tint-orange{% endif %}" style="width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:0 0 40px;">
-                <svg class="ic"><use href="#i-pill"/></svg></span>
-              <div class="grow">
-                <div class="t">{{ row.med.name }} <span style="color:var(--muted);font-weight:600;">{{ row.med.dose }}</span></div>
-                <div class="s">{{ row.med.schedule }} &middot; Refill: {{ row.refill_in }}</div>
+            <div class="lrow" style="flex-direction:column;align-items:stretch;gap:12px;">
+
+              <div style="display:flex;gap:12px;align-items:center;">
+                <span class="ri tint-orange" style="width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:0 0 40px;">
+                  <svg class="ic"><use href="#i-pill"/></svg></span>
+                <div class="grow">
+                  <div class="t">{{ row.med.name }}
+                    <span style="color:var(--muted);font-weight:600;">{{ row.med.dose }}</span>
+                    {% if row.med.needs_schedule_review %}<span class="pill warn">Times not set</span>{% endif %}
+                    {% if row.med.is_out_of_stock %}<span class="pill danger">Out of stock</span>
+                    {% elif row.low_stock %}<span class="pill warn">{{ row.days_left }} day{{ row.days_left|pluralize }} left</span>{% endif %}
+                  </div>
+                  <div class="s">As written: &ldquo;{{ row.med.schedule }}&rdquo;
+                    {% if row.med.duration_days %}&middot; {{ row.med.duration_days }}-day course{% endif %}
+                    &middot; Refill: {{ row.refill_in }}</div>
+                </div>
+                <form method="post">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="stop">
+                  <input type="hidden" name="medication_id" value="{{ row.med.id }}">
+                  <button type="submit" class="btn btn-danger-ghost" style="padding:7px 12px;font-size:12.5px;">Stop</button>
+                </form>
               </div>
-              <form method="post" style="display:flex;gap:8px;align-items:center;">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="toggle_dose">
-                <input type="hidden" name="dose_id" value="{{ row.dose.id }}">
-                <button type="submit" class="btn {% if row.dose.taken %}btn-ghost{% else %}btn-green{% endif %}" style="padding:7px 12px;font-size:12.5px;">
-                  {% if row.dose.taken %}Undo{% else %}<svg class="ic"><use href="#i-check"/></svg> Mark taken{% endif %}
-                </button>
-              </form>
-              <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="stop">
-                <input type="hidden" name="medication_id" value="{{ row.med.id }}">
-                <button type="submit" class="btn btn-danger-ghost" style="padding:7px 12px;font-size:12.5px;">Stop</button>
-              </form>
+
+              {% if row.doses %}
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                {% for d in row.doses %}
+                <form method="post">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="toggle_dose">
+                  <input type="hidden" name="dose_id" value="{{ d.id }}">
+                  <button type="submit"
+                          class="btn {% if d.taken %}btn-ghost{% elif d.is_missed %}btn-danger-ghost{% else %}btn-green{% endif %}"
+                          style="padding:8px 12px;font-size:12.5px;">
+                    {% if d.taken %}<svg class="ic"><use href="#i-check"/></svg>{% endif %}
+                    {{ d.dose_time.get_slot_display }} {{ d.dose_time.at_time|time:"H:i" }}
+                    &middot; {{ d.dose_time.quantity|floatformat:"-2" }}
+                    {% if d.taken %} — taken{% elif d.is_missed %} — missed{% elif d.is_due %} — due now{% endif %}
+                  </button>
+                </form>
+                {% endfor %}
+              </div>
+              {% else %}
+              <p class="s" style="margin:0;">No reminder times set for this medicine yet.</p>
+              {% endif %}
+
+              <details>
+                <summary class="s" style="cursor:pointer;">Reminder times &amp; stock</summary>
+
+                <form method="post" style="margin-top:10px;">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="set_times">
+                  <input type="hidden" name="medication_id" value="{{ row.med.id }}">
+                  <table class="dtable">
+                    <thead><tr><th>When</th><th>Time</th><th>How many</th></tr></thead>
+                    <tbody>
+                    {% for slot_value, slot_label in slots %}
+                      <tr>
+                        <td>{{ slot_label }}</td>
+                        <td><input type="time" name="time_{{ slot_value }}" class="inp" style="max-width:130px;"
+                                   value="{% for dt in row.dose_times %}{% if dt.slot == slot_value %}{{ dt.at_time|time:'H:i' }}{% endif %}{% endfor %}"></td>
+                        <td><input type="number" step="0.25" min="0" name="qty_{{ slot_value }}" class="inp" style="max-width:110px;"
+                                   placeholder="0"
+                                   value="{% for dt in row.dose_times %}{% if dt.slot == slot_value %}{{ dt.quantity|floatformat:'-2' }}{% endif %}{% endfor %}"></td>
+                      </tr>
+                    {% endfor %}
+                    </tbody>
+                  </table>
+                  <p class="s" style="margin:6px 0 10px;">Leave "how many" blank or 0 to switch that reminder off.</p>
+                  <button type="submit" class="btn btn-teal" style="padding:8px 14px;font-size:12.5px;">Save times</button>
+                </form>
+
+                <form method="post" style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-top:14px;">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="update_stock">
+                  <input type="hidden" name="medication_id" value="{{ row.med.id }}">
+                  <div class="field" style="margin:0;"><label>Tablets left at home</label>
+                    <input type="number" step="0.5" min="0" name="stock_on_hand" class="inp" style="max-width:150px;"
+                           value="{{ row.med.stock_on_hand|default_if_none:'' }}"></div>
+                  <div class="field" style="margin:0;"><label>Warn me this many days ahead</label>
+                    <input type="number" min="1" name="restock_threshold_days" class="inp" style="max-width:150px;"
+                           value="{{ row.med.restock_threshold_days }}"></div>
+                  <button type="submit" class="btn btn-ghost" style="padding:9px 14px;font-size:12.5px;">Update stock</button>
+                </form>
+
+                {% if row.days_left is not None %}
+                <p class="s" style="margin-top:8px;">Taking {{ row.med.daily_quantity|floatformat:"-2" }} a day &mdash;
+                  about <b>{{ row.days_left }} day{{ row.days_left|pluralize }}</b> of supply left,
+                  running out around {{ row.med.projected_runout_date|date:"j M Y" }}.</p>
+                {% else %}
+                <p class="s" style="margin-top:8px;">Enter how many tablets you have left and we will tell you when to reorder.</p>
+                {% endif %}
+              </details>
             </div>
             {% empty %}
             <p style="color:var(--muted);font-size:13.5px;">No active medicines yet &mdash; add your first one using the form.</p>
@@ -68,14 +177,48 @@
 
         <div class="panel"><div class="p-body tall">
           <h3 class="p-h"><svg class="ic"><use href="#i-pill"/></svg> Add a medicine</h3>
+          <p class="s" style="margin-bottom:12px;">No prescription photo needed &mdash; type the details in and
+          reminders start straight away.</p>
           <form method="post">
             {% csrf_token %}
             <input type="hidden" name="action" value="add">
             <div class="field"><label>Medicine name</label><input type="text" name="name" class="inp" placeholder="e.g. Metformin" required></div>
             <div class="field"><label>Dose</label><input type="text" name="dose" class="inp" placeholder="e.g. 500 mg" required></div>
-            <div class="field"><label>Schedule</label><input type="text" name="schedule" class="inp" placeholder="e.g. Twice daily, with meals" required></div>
             <div class="field"><label>Start date</label><input type="date" name="start_date" class="inp" value="{{ today|date:'Y-m-d' }}" required></div>
-            <div class="field"><label>Next refill date (optional)</label><input type="date" name="next_refill_date" class="inp"></div>
+
+            <div class="callout muted" style="margin:14px 0 10px;">
+              <svg class="ic"><use href="#i-clock"/></svg>
+              <div class="c-body">Set the times below, <b>or</b> write the schedule underneath and we will
+              work them out. If you do both, your times win.</div>
+            </div>
+
+            <label style="font-weight:700;font-size:12.5px;">When do you take it?</label>
+            <table class="dtable" style="margin-bottom:10px;">
+              <thead><tr><th>When</th><th>Time</th><th>How many</th></tr></thead>
+              <tbody>
+              {% for slot_value, slot_label in slots %}
+                <tr>
+                  <td>{{ slot_label }}</td>
+                  <td><input type="time" name="time_{{ slot_value }}" class="inp" style="max-width:120px;"
+                             value="{% if slot_value == 'MORNING' %}08:00{% elif slot_value == 'AFTERNOON' %}13:00{% elif slot_value == 'EVENING' %}18:00{% else %}21:00{% endif %}"></td>
+                  <td><input type="number" step="0.25" min="0" name="qty_{{ slot_value }}" class="inp"
+                             style="max-width:100px;" placeholder="0"></td>
+                </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+            <p class="s" style="margin:0 0 12px;">Leave "how many" blank for the times you don't take it.</p>
+
+            <div class="field"><label>Or write the schedule</label>
+              <input type="text" name="schedule" class="inp" placeholder="e.g. 1-0-1, twice daily, HS">
+              <p class="s" style="margin-top:4px;">We understand 1-0-1, "1 morning 1 night", BD, TDS, OD, HS and
+              "twice daily".</p></div>
+
+            <div class="field"><label>Course length in days (optional)</label>
+              <input type="number" min="1" name="duration_days" class="inp" placeholder="e.g. 5"></div>
+            <div class="field"><label>Tablets received (optional)</label>
+              <input type="number" step="0.5" min="0" name="quantity_dispensed" class="inp" placeholder="e.g. 30">
+              <p class="s" style="margin-top:4px;">Needed for restock reminders &mdash; we count this down as you tick off doses.</p></div>
             <button type="submit" class="btn btn-teal block">Add medicine</button>
           </form>
         </div></div>

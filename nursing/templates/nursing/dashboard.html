@@ -45,7 +45,7 @@
             <div class="p-spec">{{ c.patient.unique_id }}</div>
             <div class="p-meta">
               {% if c.latest_vital %}
-                Last reading {{ c.latest_vital.bp_systolic }}/{{ c.latest_vital.bp_diastolic }} on {{ c.latest_vital.recorded_at|date:"j M" }}
+                Last reading {{ c.latest_vital.bp_display }} on {{ c.latest_vital.recorded_at|date:"j M" }}
               {% else %}No readings yet{% endif %}
               <br>
               {% if c.last_visit %}Last visit {{ c.last_visit.visited_at|date:"j M Y" }}{% else %}No visits logged{% endif %}

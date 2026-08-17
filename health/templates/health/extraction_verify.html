@@ -35,7 +35,7 @@
           </p>
 
           <table class="dtable">
-            <thead><tr><th style="width:52px;">Keep</th><th>Medicine</th><th>Dose</th><th>How often</th><th>Confidence</th></tr></thead>
+            <thead><tr><th style="width:52px;">Keep</th><th>Medicine</th><th>Dose</th><th>How often</th><th>For how long</th><th>Tablets given</th><th>Confidence</th></tr></thead>
             <tbody>
               {% for item in items %}
               <tr>
@@ -44,7 +44,9 @@
                            style="width:20px;height:20px;"></td>
                 <td><input type="text" name="name_{{ item.id }}" value="{{ item.name }}" class="inp" style="min-width:170px;"></td>
                 <td><input type="text" name="dose_{{ item.id }}" value="{{ item.dose }}" class="inp" style="min-width:100px;" placeholder="e.g. 500 mg"></td>
-                <td><input type="text" name="frequency_{{ item.id }}" value="{{ item.frequency }}" class="inp" style="min-width:150px;" placeholder="e.g. Twice daily"></td>
+                <td><input type="text" name="frequency_{{ item.id }}" value="{{ item.frequency }}" class="inp" style="min-width:150px;" placeholder="e.g. 1-0-1"></td>
+                <td><input type="text" name="duration_{{ item.id }}" value="{{ item.duration }}" class="inp" style="min-width:110px;" placeholder="e.g. 5 days"></td>
+                <td><input type="number" step="0.5" min="0" name="quantity_{{ item.id }}" class="inp" style="min-width:100px;" placeholder="e.g. 10"></td>
                 <td>
                   {% if item.confidence_band == 'high' %}<span class="pill ok">High</span>
                   {% elif item.confidence_band == 'medium' %}<span class="pill warn">Medium</span>
@@ -90,7 +92,7 @@
 
         <div class="panel"><div class="p-body tall">
           <h3 class="p-h"><svg class="ic"><use href="#i-activity"/></svg> How this was read</h3>
-          <div class="kv"><span class="k">Text recognition</span><span class="v">Tesseract, on this computer</span></div>
+          <div class="kv"><span class="k">Text recognition</span><span class="v">{% if job.ocr_confidence == 100.0 %}Read from the PDF text{% else %}Tesseract, on this computer{% endif %}</span></div>
           <div class="kv"><span class="k">Recognition quality</span>
             <span class="v">{% if job.ocr_confidence %}{{ job.ocr_confidence }}%{% else %}&mdash;{% endif %}</span></div>
           <div class="kv"><span class="k">Understood by</span><span class="v">{{ job.get_parser_used_display }}</span></div>
