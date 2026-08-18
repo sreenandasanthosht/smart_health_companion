@@ -243,8 +243,10 @@
             <div class="rem {% if not d.taken %}hl{% endif %}">
               <span class="ri {% if d.taken %}tint-green{% else %}tint-orange{% endif %}"><svg class="ic"><use href="#i-pill"/></svg></span>
               <div><div class="t">{{ d.medication.name }} {{ d.medication.dose }}</div>
-                <div class="s">{{ d.medication.schedule }}</div></div>
-              <span class="pill {% if d.taken %}ok{% else %}warn{% endif %}">{% if d.taken %}Taken{% else %}Due{% endif %}</span>
+                <div class="s">{{ d.dose_time.get_slot_display }} at {{ d.dose_time.at_time|time:"H:i" }}
+                  &middot; {{ d.dose_time.quantity|floatformat:"-2" }}</div></div>
+              <span class="pill {% if d.taken %}ok{% elif d.is_missed %}danger{% elif d.is_due %}warn{% else %}muted{% endif %}">
+                {% if d.taken %}Taken{% elif d.is_missed %}Missed{% elif d.is_due %}Due now{% else %}Later{% endif %}</span>
             </div>
             {% empty %}
             <p style="color:var(--muted);font-size:13.5px;">No active medicines. Add one from the medicines page.</p>

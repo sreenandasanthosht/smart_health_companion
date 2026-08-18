@@ -2,6 +2,9 @@
 health app models -- the patient's health data (physical + mental) and the
 consent records that control who else may see it.
 """
+import datetime
+from decimal import Decimal
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -20,11 +23,15 @@ class VitalRecord(models.Model):
         SELF = 'SELF', 'Self-recorded'
         NURSE = 'NURSE', 'Nurse visit'
         CAREGIVER = 'CAREGIVER', 'Caregiver'
+        LAB_REPORT = 'LAB', 'From a lab report'
 
     patient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='vital_records')
     recorded_at = models.DateTimeField(default=timezone.now)
-    bp_systolic = models.PositiveIntegerField()
-    bp_diastolic = models.PositiveIntegerField()
+    # Optional since a lab report often carries a blood sugar or a weight
+    # with no blood pressure on it at all. A reading with only the fields
+    # the report actually contained is honest; inventing 0/0 would not be.
+    bp_systolic = models.PositiveIntegerField(null=True, blank=True)
+    bp_diastolic = models.PositiveIntegerField(null=True, blank=True)
     blood_sugar = models.DecimalField(max_digits=6, decimal_places=1, null=True, blank=True)
     weight_kg = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
     heart_rate = models.PositiveIntegerField(null=True, blank=True)
@@ -47,11 +54,30 @@ class VitalRecord(models.Model):
         the interpretable baseline the CRISP-DM write-up (task 4.8)
         compares any later trained model against.
         """
-        if self.bp_systolic >= 140 or self.bp_diastolic >= 90 or (self.heart_rate and self.heart_rate >= 110):
+        sys_bp = self.bp_systolic or 0
+        dia_bp = self.bp_diastolic or 0
+        sugar = float(self.blood_sugar) if self.blood_sugar is not None else 0.0
+
+        if (sys_bp >= 140 or dia_bp >= 90
+                or (self.heart_rate and self.heart_rate >= 110)
+                or sugar >= 180):
             return self.Status.HIGH
-        if self.bp_systolic >= 130 or self.bp_diastolic >= 85 or (self.heart_rate and self.heart_rate >= 100):
+        if (sys_bp >= 130 or dia_bp >= 85
+                or (self.heart_rate and self.heart_rate >= 100)
+                or sugar >= 126):
             return self.Status.WATCH
         return self.Status.NORMAL
+
+    @property
+    def bp_display(self):
+        """'120/80', or a dash when this reading carried no blood pressure."""
+        if self.bp_systolic is None or self.bp_diastolic is None:
+            return '—'
+        return f'{self.bp_systolic}/{self.bp_diastolic}'
+
+    @property
+    def has_bp(self):
+        return self.bp_systolic is not None and self.bp_diastolic is not None
 
     def save(self, *args, **kwargs):
         self.status = self.compute_status()
@@ -65,31 +91,266 @@ class Medication(models.Model):
     patient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='medications')
     name = models.CharField(max_length=120)
     dose = models.CharField(max_length=60)
+    # The schedule as it was written on the prescription. Kept for display
+    # and for the patient to check against; the machine-readable version
+    # lives in the related `DoseTime` rows.
     schedule = models.CharField(max_length=120)
     start_date = models.DateField()
     next_refill_date = models.DateField(null=True, blank=True)
     active = models.BooleanField(default=True)
 
+    # ---- course length and stock, which is what makes a restock alert
+    # possible. Without a quantity there is nothing to count down.
+    duration_days = models.PositiveIntegerField(
+        null=True, blank=True, help_text='How many days the course runs, if it is time-limited.')
+    quantity_dispensed = models.DecimalField(
+        max_digits=7, decimal_places=1, null=True, blank=True,
+        help_text='How many tablets/units were handed over.')
+    stock_on_hand = models.DecimalField(
+        max_digits=7, decimal_places=1, null=True, blank=True,
+        help_text='How many are left at home right now. Counts down as doses are taken.')
+    restock_threshold_days = models.PositiveIntegerField(
+        default=3, help_text='Warn this many days before the supply runs out.')
+
+    # Set when a written schedule could not be read into dose times. The
+    # medications page asks the patient to fix these, rather than the app
+    # quietly reminding at the wrong hour.
+    needs_schedule_review = models.BooleanField(default=False)
+    # Stops the low-stock warning being raised again every time a page loads.
+    restock_alerted_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         ordering = ['-start_date']
+
+    # ---- scheduling ------------------------------------------------------
+
+    @property
+    def daily_quantity(self):
+        """Units consumed per day across all dose times."""
+        return sum((dt.quantity for dt in self.dose_times.all()), Decimal('0'))
+
+    @property
+    def doses_per_day(self):
+        return self.dose_times.count()
+
+    @property
+    def has_schedule(self):
+        return self.dose_times.exists()
+
+    # ---- stock -----------------------------------------------------------
+
+    @property
+    def days_of_stock_left(self):
+        """
+        Whole days of supply remaining, or None when it cannot be known.
+
+        Returns None rather than 0 when stock or the schedule is missing --
+        "we don't know" and "you have run out" are different answers and
+        must not be shown as the same thing.
+        """
+        if self.stock_on_hand is None:
+            return None
+        per_day = self.daily_quantity
+        if per_day <= 0:
+            return None
+        return int(self.stock_on_hand // per_day)
+
+    @property
+    def projected_runout_date(self):
+        days = self.days_of_stock_left
+        if days is None:
+            return None
+        return timezone.localdate() + datetime.timedelta(days=days)
+
+    @property
+    def is_low_stock(self):
+        days = self.days_of_stock_left
+        return days is not None and days <= self.restock_threshold_days
+
+    @property
+    def is_out_of_stock(self):
+        return self.stock_on_hand is not None and self.stock_on_hand <= 0
+
+    def recompute_refill_date(self, save=True):
+        """
+        Derive the refill date from stock and consumption.
+
+        `next_refill_date` used to be a date somebody typed. Now it is the
+        day the supply is projected to run out, so it cannot drift out of
+        step with what has actually been taken.
+        """
+        projected = self.projected_runout_date
+        if projected and projected != self.next_refill_date:
+            self.next_refill_date = projected
+            if save:
+                self.save(update_fields=['next_refill_date'])
+        return self.next_refill_date
+
+    def consume(self, quantity, save=True):
+        """Take `quantity` units out of stock, never going below zero."""
+        if self.stock_on_hand is None:
+            return
+        self.stock_on_hand = max(self.stock_on_hand - Decimal(quantity), Decimal('0'))
+        if save:
+            self.save(update_fields=['stock_on_hand'])
+            self.recompute_refill_date()
+
+    def restore(self, quantity, save=True):
+        """Put `quantity` units back -- used when a dose tick is undone."""
+        if self.stock_on_hand is None:
+            return
+        self.stock_on_hand = self.stock_on_hand + Decimal(quantity)
+        if save:
+            self.save(update_fields=['stock_on_hand'])
+            self.recompute_refill_date()
+
+    def set_schedule_from_text(self, text=None):
+        """
+        Rebuild this medication's dose times from a written schedule.
+
+        Returns the `ParsedSchedule` so the caller can tell the patient what
+        happened. A schedule that could not be read leaves the medication
+        with no dose times and `needs_schedule_review` set -- never with
+        guessed ones.
+        """
+        from health import schedules
+
+        parsed = schedules.parse_schedule(text if text is not None else self.schedule)
+        self.dose_times.all().delete()
+        if parsed.confident and parsed.slots:
+            for slot, quantity in parsed.slots.items():
+                DoseTime.objects.create(
+                    medication=self, slot=slot,
+                    at_time=DoseTime.DEFAULT_TIMES[slot], quantity=quantity)
+            self.needs_schedule_review = False
+        else:
+            self.needs_schedule_review = True
+        self.save(update_fields=['needs_schedule_review'])
+        return parsed
 
     def __str__(self):
         return f"{self.name} ({self.patient})"
 
 
+class DoseTime(models.Model):
+    """
+    One time of day this medicine is taken, and how much.
+
+    This is the piece that makes reminders possible. "1-0-1" becomes two
+    rows -- morning 08:00 x1 and night 21:00 x1 -- and each row is what an
+    alert fires against.
+    """
+    class Slot(models.TextChoices):
+        MORNING = 'MORNING', 'Morning'
+        AFTERNOON = 'AFTERNOON', 'Afternoon'
+        EVENING = 'EVENING', 'Evening'
+        NIGHT = 'NIGHT', 'Night'
+
+    # Sensible starting times. The patient can change any of them; nobody
+    # should have to accept 8 AM because the software said so.
+    DEFAULT_TIMES = {
+        Slot.MORNING: datetime.time(8, 0),
+        Slot.AFTERNOON: datetime.time(13, 0),
+        Slot.EVENING: datetime.time(18, 0),
+        Slot.NIGHT: datetime.time(21, 0),
+    }
+
+    medication = models.ForeignKey(Medication, on_delete=models.CASCADE, related_name='dose_times')
+    slot = models.CharField(max_length=10, choices=Slot.choices)
+    at_time = models.TimeField()
+    quantity = models.DecimalField(max_digits=4, decimal_places=2, default=Decimal('1'))
+
+    class Meta:
+        ordering = ['at_time']
+        unique_together = [('medication', 'slot')]
+
+    def scheduled_datetime(self, on_date=None):
+        """This dose time as an aware datetime on a given date."""
+        on_date = on_date or timezone.localdate()
+        naive = datetime.datetime.combine(on_date, self.at_time)
+        return timezone.make_aware(naive, timezone.get_current_timezone())
+
+    def __str__(self):
+        return f"{self.medication.name} {self.get_slot_display()} {self.at_time:%H:%M}"
+
+
 class MedicationDose(models.Model):
-    """One 'taken / missed' tick for a medication on a given day."""
+    """
+    One 'taken / missed' tick for a medication at one time on one day.
+
+    This used to be one row per medication per *day*, which meant a
+    medicine taken three times a day could only be ticked once -- so
+    adherence was wrong and a missed evening dose was invisible. It is now
+    one row per dose time, which is also what the reminder fires against.
+
+    `dose_time` is nullable so the rows recorded under the old one-per-day
+    scheme survive the change instead of being thrown away.
+    """
     medication = models.ForeignKey(Medication, on_delete=models.CASCADE, related_name='doses')
+    dose_time = models.ForeignKey(DoseTime, on_delete=models.CASCADE, null=True, blank=True,
+                                  related_name='doses')
     date = models.DateField(default=timezone.localdate)
     taken = models.BooleanField(default=False)
     taken_at = models.DateTimeField(null=True, blank=True)
 
+    # Stamps so a reminder and a missed-dose alert are each raised once,
+    # however many times the alert job runs.
+    reminded_at = models.DateTimeField(null=True, blank=True)
+    missed_alerted_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
-        unique_together = [('medication', 'date')]
+        unique_together = [('medication', 'date', 'dose_time')]
         ordering = ['-date']
 
+    # How long after the scheduled time a dose is still "due" rather than
+    # "missed". Two hours is forgiving enough for a real morning.
+    GRACE = datetime.timedelta(hours=2)
+
+    @property
+    def scheduled_at(self):
+        if self.dose_time is None:
+            return None
+        return self.dose_time.scheduled_datetime(self.date)
+
+    @property
+    def is_due(self):
+        """Time to take it: the hour has arrived but the grace period hasn't run out."""
+        when = self.scheduled_at
+        if when is None or self.taken:
+            return False
+        return when <= timezone.now() < when + self.GRACE
+
+    @property
+    def is_missed(self):
+        when = self.scheduled_at
+        if when is None or self.taken:
+            return False
+        return timezone.now() >= when + self.GRACE
+
+    @property
+    def is_upcoming(self):
+        when = self.scheduled_at
+        if when is None or self.taken:
+            return False
+        return timezone.now() < when
+
+    def mark_taken(self):
+        self.taken = True
+        self.taken_at = timezone.now()
+        self.save(update_fields=['taken', 'taken_at'])
+        if self.dose_time:
+            self.medication.consume(self.dose_time.quantity)
+
+    def mark_not_taken(self):
+        self.taken = False
+        self.taken_at = None
+        self.save(update_fields=['taken', 'taken_at'])
+        if self.dose_time:
+            self.medication.restore(self.dose_time.quantity)
+
     def __str__(self):
-        return f"{self.medication.name} on {self.date} ({'taken' if self.taken else 'missed'})"
+        label = self.dose_time.get_slot_display() if self.dose_time else 'day'
+        return f"{self.medication.name} {label} on {self.date} ({'taken' if self.taken else 'not taken'})"
 
 
 class LifestyleLog(models.Model):
@@ -411,6 +672,115 @@ class ExtractionJob(models.Model):
 
     def __str__(self):
         return f"{self.get_source_type_display()} for {self.patient} ({self.status})"
+
+
+class LabReport(models.Model):
+    """
+    A lab report the patient has confirmed, minus the report itself.
+
+    The uploaded image is discarded exactly as a prescription's is. What
+    persists is the structured values, which is the whole point: a number
+    in a table can be charted and compared, where a stored PDF can only be
+    opened and squinted at.
+    """
+    patient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                                related_name='lab_reports')
+    reported_on = models.DateField(default=timezone.localdate)
+    lab_name = models.CharField(max_length=150, blank=True)
+    note = models.CharField(max_length=255, blank=True)
+    # Set when some values on this report were routed into vitals tracking
+    # instead of being kept here, so the patient can see where they went.
+    vitals_record = models.ForeignKey(
+        'VitalRecord', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='from_lab_reports')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-reported_on', '-created_at']
+
+    @property
+    def abnormal_count(self):
+        # UNKNOWN is not abnormal -- it means the report printed no range to
+        # compare against. Counting it as a flag would tell the patient
+        # something was wrong when nothing was actually assessed.
+        return self.values.filter(
+            flag__in=[LabResultValue.Flag.LOW, LabResultValue.Flag.HIGH]).count()
+
+    def __str__(self):
+        return f"Lab report for {self.patient} on {self.reported_on:%d %b %Y}"
+
+
+class LabResultValue(models.Model):
+    """
+    One measured value on a confirmed lab report.
+
+    Only values that are *not* vitals live here. Blood pressure, blood
+    sugar, weight and pulse are written to `VitalRecord` instead, so they
+    join the patient's existing trend charts rather than sitting in a
+    second, parallel history of the same measurements.
+    """
+    class Flag(models.TextChoices):
+        NORMAL = 'NORMAL', 'Normal'
+        LOW = 'LOW', 'Low'
+        HIGH = 'HIGH', 'High'
+        UNKNOWN = 'UNKNOWN', 'Not known'
+
+    report = models.ForeignKey(LabReport, on_delete=models.CASCADE, related_name='values')
+    analyte = models.CharField(max_length=120)
+    value = models.CharField(max_length=40)
+    unit = models.CharField(max_length=30, blank=True)
+    reference_range = models.CharField(max_length=60, blank=True)
+    flag = models.CharField(max_length=8, choices=Flag.choices, default=Flag.UNKNOWN)
+
+    class Meta:
+        ordering = ['analyte']
+
+    @property
+    def is_abnormal(self):
+        return self.flag in {self.Flag.LOW, self.Flag.HIGH}
+
+    def __str__(self):
+        return f"{self.analyte}: {self.value} {self.unit}".strip()
+
+
+class ExtractedLabValue(models.Model):
+    """
+    One value read off a lab report, pending the patient's confirmation.
+
+    The lab-report equivalent of `ExtractedMedication`. `vital_field`
+    records which `VitalRecord` column this value would be written to, and
+    is empty for everything that is not a vital -- that single field is
+    what splits the two destinations at confirmation time.
+    """
+    job = models.ForeignKey(ExtractionJob, on_delete=models.CASCADE, related_name='lab_values')
+    analyte = models.CharField(max_length=120)
+    value = models.CharField(max_length=40)
+    unit = models.CharField(max_length=30, blank=True)
+    reference_range = models.CharField(max_length=60, blank=True)
+    flag = models.CharField(max_length=8, choices=LabResultValue.Flag.choices,
+                            default=LabResultValue.Flag.UNKNOWN)
+    vital_field = models.CharField(
+        max_length=20, blank=True,
+        help_text="Which VitalRecord field this maps to, or blank if it is not a vital.")
+    confidence = models.FloatField(default=0.0)
+    confirmed = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-confidence', 'analyte']
+
+    @property
+    def is_vital(self):
+        return bool(self.vital_field)
+
+    def confidence_band(self):
+        if self.confidence >= 0.8:
+            return 'high'
+        if self.confidence >= 0.5:
+            return 'medium'
+        return 'low'
+
+    def __str__(self):
+        return f"{self.analyte}: {self.value} {self.unit}".strip()
 
 
 class ExtractedMedication(models.Model):

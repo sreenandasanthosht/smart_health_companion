@@ -19,4 +19,10 @@ urlpatterns = [
 
     path('notifications/', views.notifications_view, name='notifications'),
     path('report/', views.report_problem, name='report_problem'),
+
+    # Lab reports get their own tab: what happens to a lab report after
+    # extraction has nothing in common with what happens to a prescription.
+    path('lab-report/', views.lab_report_upload, name='health_lab_upload'),
+    path('lab-report/<int:job_id>/verify/', views.lab_report_verify, name='health_lab_verify'),
+    path('lab-results/', views.lab_results, name='health_lab_results'),
 ]

@@ -23,17 +23,16 @@
           <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
             <div class="field">
-              <label>Prescription or lab report</label>
-              <input type="file" name="document" class="inp" accept="image/*" required>
-              <div class="hint">A JPG or PNG photo, up to 15 MB. Take it straight on, in good light.</div>
+              <label>Prescription</label>
+              <input type="file" name="document" class="inp" accept="image/*,application/pdf" required>
+              <div class="hint">A PDF, or a JPG/PNG photo, up to 15 MB. <b>A PDF reads far more accurately</b> — the text is already in the file, so nothing has to be recognised. Take it straight on, in good light.</div>
             </div>
 
-            <div class="field">
-              <label>What is this?</label>
-              <select name="source_type" class="inp">
-                <option value="PRESCRIPTION">A prescription</option>
-                <option value="LAB_REPORT">A lab report</option>
-              </select>
+            <div class="callout info" style="margin-bottom:16px;">
+              <svg class="ic"><use href="#i-flask"/></svg>
+              <div class="c-body">Got a <b>lab report</b> instead? Use the
+                <a href="{% url 'health_lab_upload' %}">Lab Reports</a> tab &mdash; results are
+                read differently, and any vitals on them go into your vitals tracking.</div>
             </div>
 
             <div class="callout muted" style="margin-bottom:16px;">

@@ -8,6 +8,7 @@ gating breaks, or the consent rules leak data, these fail.
 Run with:  python manage.py test
 """
 import datetime
+from decimal import Decimal
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -143,16 +144,161 @@ class PatientDataTests(TestCase):
         self.assertEqual(VitalRecord.objects.count(), 0)
 
     def test_adding_medicine_and_ticking_a_dose(self):
+        """
+        'Twice daily' becomes two dose times, and therefore two tick rows.
+
+        This is the point of the structured schedule: one row per day could
+        not tell a missed evening dose from a taken one, so adherence was
+        wrong for anything taken more than once a day.
+        """
         self.client.post(reverse('health_medications'), {
             'action': 'add', 'name': 'Metformin', 'dose': '500 mg',
-            'schedule': 'Twice daily', 'start_date': timezone.localdate().isoformat()})
+            'schedule': 'Twice daily', 'start_date': timezone.localdate().isoformat(),
+            'quantity_dispensed': '20'})
         med = Medication.objects.get(patient=self.patient)
-        self.client.get(reverse('health_medications'))  # creates today's dose row
-        dose = MedicationDose.objects.get(medication=med, date=timezone.localdate())
+        self.assertEqual(med.dose_times.count(), 2)
+        self.assertFalse(med.needs_schedule_review)
+
+        self.client.get(reverse('health_medications'))  # creates today's dose rows
+        doses = MedicationDose.objects.filter(medication=med, date=timezone.localdate(),
+                                              dose_time__isnull=False)
+        self.assertEqual(doses.count(), 2)
+
+        dose = doses.first()
         self.assertFalse(dose.taken)
         self.client.post(reverse('health_medications'), {'action': 'toggle_dose', 'dose_id': dose.id})
         dose.refresh_from_db()
         self.assertTrue(dose.taken)
+
+        # Ticking a dose off draws it out of stock, which is what drives the
+        # restock warning.
+        med.refresh_from_db()
+        self.assertEqual(med.stock_on_hand, Decimal('19.0'))
+
+    def test_lab_report_splits_vitals_from_lab_values(self):
+        """
+        The point of the lab tab: one report, two destinations.
+
+        Vitals go to VitalRecord so they join the existing trend charts;
+        everything else is kept as lab results. HbA1c is deliberately a lab
+        value, not a vital -- it is a three-month average, not a reading
+        taken at a moment.
+        """
+        from unittest import mock
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        from health.models import ExtractionJob, LabReport, VitalRecord
+
+        report_text = (
+            "Prakash Diagnostics\n"
+            "Haemoglobin            10.2       g/dL        12.0 - 15.5\n"
+            "HbA1c                  7.8        %           < 5.7\n"
+            "Blood Sugar (Fasting)  148        mg/dL       70 - 100\n"
+            "B.P.                   146/94\n"
+            "Weight                 71.4       kg\n"
+        )
+
+        with mock.patch('health.extraction.extract_text',
+                        return_value=(report_text, 82.5)):
+            self.client.post(reverse('health_lab_upload'), {
+                'document': SimpleUploadedFile('r.png', b'bytes', content_type='image/png'),
+                'consent': '1'})
+
+        job = ExtractionJob.objects.get(patient=self.patient)
+        self.assertEqual(job.source_type, ExtractionJob.Source.LAB_REPORT)
+        # The promise: the image is gone before the patient ever sees a page.
+        self.assertIsNotNone(job.file_deleted_at)
+
+        post = {'reported_on': timezone.localdate().isoformat(), 'lab_name': 'Prakash'}
+        for v in job.lab_values.all():
+            post.update({
+                f'keep_{v.id}': '1', f'analyte_{v.id}': v.analyte,
+                f'value_{v.id}': v.value, f'unit_{v.id}': v.unit,
+                f'range_{v.id}': v.reference_range,
+            })
+        self.client.post(reverse('health_lab_verify', args=[job.id]), post)
+
+        vital = VitalRecord.objects.get(patient=self.patient)
+        self.assertEqual(vital.source, VitalRecord.Source.LAB_REPORT)
+        self.assertEqual(vital.bp_systolic, 146)
+        self.assertEqual(vital.bp_diastolic, 94)
+        self.assertEqual(float(vital.blood_sugar), 148.0)
+        self.assertEqual(float(vital.weight_kg), 71.4)
+
+        report = LabReport.objects.get(patient=self.patient)
+        analytes = {v.analyte.lower() for v in report.values.all()}
+        self.assertIn('hba1c', analytes)
+        self.assertIn('haemoglobin', analytes)
+        # Vitals must not be duplicated into the lab-results table.
+        self.assertNotIn('weight', analytes)
+        self.assertFalse(any('blood pressure' in a for a in analytes))
+
+        # The transcribed text is dropped once it has served its purpose.
+        job.refresh_from_db()
+        self.assertEqual(job.raw_text, '')
+        self.assertEqual(job.status, ExtractionJob.Status.CONFIRMED)
+
+    def test_discarding_a_lab_report_saves_nothing(self):
+        from unittest import mock
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        from health.models import ExtractionJob, LabReport, VitalRecord
+
+        with mock.patch('health.extraction.extract_text',
+                        return_value=("Haemoglobin 10.2 g/dL 12.0 - 15.5\n", 80.0)):
+            self.client.post(reverse('health_lab_upload'), {
+                'document': SimpleUploadedFile('r.png', b'bytes', content_type='image/png'),
+                'consent': '1'})
+
+        job = ExtractionJob.objects.get(patient=self.patient)
+        self.client.post(reverse('health_lab_verify', args=[job.id]), {'action': 'discard'})
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, ExtractionJob.Status.DISCARDED)
+        self.assertEqual(job.raw_text, '')
+        self.assertEqual(LabReport.objects.count(), 0)
+        self.assertEqual(VitalRecord.objects.count(), 0)
+
+    def test_lab_report_upload_without_consent_reads_nothing(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        from health.models import ExtractionJob
+
+        self.client.post(reverse('health_lab_upload'), {
+            'document': SimpleUploadedFile('r.png', b'bytes', content_type='image/png')})
+        self.assertEqual(ExtractionJob.objects.count(), 0)
+
+    def test_unreadable_schedule_sets_no_reminders(self):
+        """A schedule we cannot parse must produce no dose times at all."""
+        self.client.post(reverse('health_medications'), {
+            'action': 'add', 'name': 'Vitamin D', 'dose': '1 sachet',
+            'schedule': 'as advised by doctor', 'start_date': timezone.localdate().isoformat()})
+        med = Medication.objects.get(patient=self.patient, name='Vitamin D')
+        self.assertEqual(med.dose_times.count(), 0)
+        self.assertTrue(med.needs_schedule_review)
+
+    def test_restock_alert_fires_once_when_stock_runs_low(self):
+        from accounts.models import Notification
+        from health import alerts
+
+        self.client.post(reverse('health_medications'), {
+            'action': 'add', 'name': 'Amlodipine', 'dose': '5 mg',
+            'schedule': '1-0-1', 'start_date': timezone.localdate().isoformat(),
+            'quantity_dispensed': '2'})
+        med = Medication.objects.get(patient=self.patient, name='Amlodipine')
+        self.assertEqual(med.daily_quantity, Decimal('2'))
+        self.assertEqual(med.days_of_stock_left, 1)
+        self.assertTrue(med.is_low_stock)
+
+        first = alerts.run_medication_alerts(patient=self.patient)
+        self.assertEqual(first['restock'], 1)
+        # Idempotent: the same warning must not be raised again on the next run.
+        second = alerts.run_medication_alerts(patient=self.patient)
+        self.assertEqual(second['restock'], 0)
+        self.assertTrue(Notification.objects.filter(
+            user=self.patient, title__startswith='Running low').exists())
 
     def test_lifestyle_log_updates_rather_than_duplicating(self):
         for water in ('1.5', '2.2'):

@@ -50,7 +50,7 @@
                 {% for r in records %}
                 <tr>
                   <td>{{ r.recorded_at|date:"j M Y, g:i A" }}</td>
-                  <td>{{ r.bp_systolic }}/{{ r.bp_diastolic }}</td>
+                  <td>{{ r.bp_display }}</td>
                   <td>{% if r.blood_sugar %}{{ r.blood_sugar }}{% else %}&mdash;{% endif %}</td>
                   <td>{% if r.weight_kg %}{{ r.weight_kg }}{% else %}&mdash;{% endif %}</td>
                   <td>{% if r.heart_rate %}{{ r.heart_rate }}{% else %}&mdash;{% endif %}</td>

@@ -18,7 +18,7 @@
             <tr>
               <td>{{ v.visited_at|date:"j M Y, g:i A" }}</td>
               <td style="font-weight:700;">{{ v.patient.display_name }}</td>
-              <td>{% if v.vitals %}{{ v.vitals.bp_systolic }}/{{ v.vitals.bp_diastolic }}{% else %}&mdash;{% endif %}</td>
+              <td>{% if v.vitals %}{{ v.vitals.bp_display }}{% else %}&mdash;{% endif %}</td>
               <td style="color:var(--muted);">{{ v.notes|truncatechars:70|default:"--" }}</td>
               <td>{% if v.escalated %}<span class="pill danger">{{ v.get_severity_display }}</span>{% else %}<span class="pill muted">Routine</span>{% endif %}</td>
             </tr>
