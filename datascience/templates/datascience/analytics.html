@@ -1,0 +1,54 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Model Performance &middot; CareNest{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar_admin.html' with active='ds_analytics' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Admin</span>
+        <h1>Recommendation engine &mdash; model performance</h1>
+        <div class="page-sub">Trained and evaluated on a synthetic cohort only. Run <code>python manage.py train_models</code> to regenerate these numbers.</div>
+      </div>
+
+      {% if not metrics %}
+      <div class="callout warn">
+        <svg class="ic"><use href="#i-shield-alert"/></svg>
+        <div class="c-body">No metrics yet. Run <code>python manage.py generate_cohort</code> then <code>python manage.py train_models</code> from the project folder.</div>
+      </div>
+      {% else %}
+      <p style="color:var(--muted);font-size:13.5px;margin-bottom:16px;">Trained on {{ metrics.trained_on_patients }} synthetic patients. Every score below is a mean &plusmn; standard deviation across {{ metrics.candidates.SLEEP.n_folds }} grouped, patient-wise cross-validation folds &mdash; no patient's data appears in both train and test within a fold.</p>
+
+      <div class="panel"><div class="p-body tall">
+        <h3 class="p-h"><svg class="ic"><use href="#i-activity"/></svg> Per-suggestion metrics</h3>
+        <table class="dtable">
+          <thead><tr><th scope="col">Suggestion</th><th scope="col">Accuracy</th><th scope="col">Precision</th><th scope="col">Recall</th><th scope="col">F1</th><th scope="col">ROC-AUC</th></tr></thead>
+          <tbody>
+            {% for key, m in metrics.candidates.items %}
+            <tr>
+              <td>{{ key }}</td>
+              <td>{% if m.accuracy.mean != None %}{{ m.accuracy.mean }} &plusmn; {{ m.accuracy.std }}{% else %}&mdash;{% endif %}</td>
+              <td>{% if m.precision.mean != None %}{{ m.precision.mean }} &plusmn; {{ m.precision.std }}{% else %}&mdash;{% endif %}</td>
+              <td>{% if m.recall.mean != None %}{{ m.recall.mean }} &plusmn; {{ m.recall.std }}{% else %}&mdash;{% endif %}</td>
+              <td>{% if m.f1.mean != None %}{{ m.f1.mean }} &plusmn; {{ m.f1.std }}{% else %}&mdash;{% endif %}</td>
+              <td>{% if m.roc_auc.mean != None %}{{ m.roc_auc.mean }} &plusmn; {{ m.roc_auc.std }}{% else %}n/a{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div class="hint" style="margin-top:10px;">A score above roughly 0.95 here is more likely a leak (too small a cohort, or a feature that gives away the label) than genuine skill &mdash; treat it as a thing to double-check, not a result to celebrate.</div>
+      </div></div>
+
+      <div class="panel" style="margin-top:20px;"><div class="p-body tall">
+        <h3 class="p-h"><svg class="ic"><use href="#i-target"/></svg> Confusion matrices</h3>
+        {% for key, m in metrics.candidates.items %}
+        <div class="lrow">
+          <div class="grow">
+            <div class="t">{{ key }}</div>
+            <div class="s">TP {{ m.confusion_matrix.tp }} &middot; TN {{ m.confusion_matrix.tn }} &middot; FP {{ m.confusion_matrix.fp }} &middot; FN {{ m.confusion_matrix.fn }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div></div>
+      {% endif %}
+
+{% endblock %}

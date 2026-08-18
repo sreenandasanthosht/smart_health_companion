@@ -19,6 +19,7 @@
         {% if stat_pending_events %}<span class="pill warn">{{ stat_pending_events }}</span>{% endif %}</a>
       <a class="nav-item {% if active == 'announcements' %}active{% endif %}" href="{% url 'admin_announcements' %}"><svg class="ic"><use href="#i-bell"/></svg> Announcements</a>
       <a class="nav-item {% if active == 'analytics' %}active{% endif %}" href="{% url 'admin_analytics' %}"><svg class="ic"><use href="#i-activity"/></svg> Platform Analytics</a>
+      <a class="nav-item {% if active == 'ds_analytics' %}active{% endif %}" href="{% url 'datascience_analytics' %}"><svg class="ic"><use href="#i-target"/></svg> Recommendation Model</a>
       <a class="nav-item {% if active == 'audit' %}active{% endif %}" href="{% url 'admin_audit_log' %}"><svg class="ic"><use href="#i-clock"/></svg> Audit Log</a>
       {% if is_super_admin %}
       <div class="nav-sep"></div>

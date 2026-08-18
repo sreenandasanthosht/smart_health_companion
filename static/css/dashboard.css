@@ -397,10 +397,75 @@ textarea.inp { resize:vertical; min-height:70px; }
 .callout.muted  { background:#f6f8fb; border-color:var(--line-2); color:#475569; }
 .callout.muted svg { color:#64748b; }
 
-/* mood chips */
-.mood-row { display:flex; flex-wrap:wrap; gap:9px; margin-bottom:14px; }
-.mood { border:1px solid #dbe2ec; background:#fff; color:var(--ink-soft); border-radius:999px; padding:8px 16px; font-size:13px; font-weight:700; cursor:pointer; transition:all .15s ease; }
-.mood:hover { border-color:var(--brand); color:#0f766e; background:var(--mint-2); }
+/* ---- mental health check-in card (Flo-style: soft, rounded, pastel) ---- */
+.checkin-card { background:linear-gradient(180deg,#faf8ff,#fff); border:1px solid #ece7fb; border-radius:22px; padding:22px 24px; margin-bottom:20px; box-shadow:0 10px 28px -18px rgba(124,58,237,.35); }
+.checkin-head { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+.checkin-head svg { color:#7c3aed; width:22px; height:22px; }
+.checkin-title { font-weight:800; font-size:15.5px; color:var(--ink); }
+.checkin-sub { font-size:12.5px; color:var(--muted); margin-top:1px; }
+
+.mood-row { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
+.mood {
+  position:relative; display:inline-flex; align-items:center; gap:8px;
+  border:1.5px solid transparent; background:var(--mood-tint, #f3f4f6); color:var(--mood-colour, var(--ink-soft));
+  border-radius:14px; padding:11px 18px 11px 14px; font-size:13.5px; font-weight:700; cursor:pointer;
+  transition:transform .15s ease, box-shadow .15s ease, background .15s ease, color .15s ease;
+}
+.mood-dot { width:9px; height:9px; border-radius:50%; background:var(--mood-colour, currentColor); flex:0 0 auto; }
+.mood-check { width:14px; height:14px; opacity:0; transform:scale(.5); transition:all .15s ease; }
+.mood:hover { transform:translateY(-1px); box-shadow:0 6px 14px -8px rgba(0,0,0,.25); }
+.mood.active { background:var(--mood-colour, var(--brand)); color:#fff; box-shadow:0 8px 18px -8px var(--mood-colour, rgba(0,0,0,.3)); transform:translateY(-1px); }
+.mood.active .mood-dot { background:#fff; }
+.mood.active .mood-check { opacity:1; transform:scale(1); }
+
+.checkin-note { margin-bottom:14px; resize:vertical; }
+.checkin-footer { display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-top:auto; }
+.checkin-footer .hint { margin:0; }
+.checkin-footer .btn { flex:0 0 auto; padding:11px 26px; }
+.checkin-card, .dump-card { display:flex; flex-direction:column; }
+
+/* ---- mental dump box ---- */
+.dump-card { background:linear-gradient(180deg,#fff8f2,#fff); border:1px solid #f3e3d3; border-radius:22px; padding:22px 24px; margin-bottom:20px; box-shadow:0 10px 28px -18px rgba(217,119,6,.3); }
+.dump-card .checkin-head svg.bin-icon { color:#c2680d; width:26px; height:26px; overflow:visible; }
+.dump-card .checkin-footer .btn { border-color:#e9d3bc; color:#a2540a; }
+.dump-textarea { margin-bottom:14px; resize:vertical; transition:transform .42s cubic-bezier(.4,0,.2,1), opacity .42s ease; transform-origin:center bottom; }
+.dump-textarea.tossing { transform:translateY(26px) scale(.88) rotate(-2deg); opacity:0; }
+.bin-icon .bin-lid { transform-origin:32px 18px; transition:transform .3s cubic-bezier(.34,1.56,.64,1); }
+.bin-icon.open .bin-lid { transform:rotate(-28deg) translate(-4px,-3px); }
+
+/* ---- mood calendar ---- */
+.cal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+.cal-nav { display:flex; gap:6px; }
+.cal-nav-btn { padding:7px 10px !important; }
+.cal-nav-btn svg { width:15px; height:15px; }
+.cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:6px; }
+.cal-grid-head { margin-bottom:8px; }
+.cal-weekday { text-align:center; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); padding-bottom:2px; }
+.cal-cell {
+  position:relative; aspect-ratio:1/1; border-radius:12px; background:var(--mood-tint, #f6f8fb);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+  border:1.5px solid transparent;
+}
+.cal-cell.outside { opacity:.35; }
+.cal-cell.today { border-color:var(--brand); }
+.cal-date { font-size:12.5px; font-weight:700; color:var(--ink-soft); }
+.cal-mood-dot { width:7px; height:7px; border-radius:50%; background:var(--mood-colour, var(--brand)); }
+.cal-legend { display:flex; flex-wrap:wrap; gap:16px; margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
+.cal-legend-item { display:inline-flex; align-items:center; gap:7px; font-size:12.5px; color:var(--ink-soft); font-weight:600; }
+.cal-legend-item .mood-dot { width:9px; height:9px; }
+@media (max-width: 640px){ .cal-date { font-size:10.5px; } .cal-cell { border-radius:8px; } }
+
+/* ---- journal ---- */
+.journal-day { margin-bottom:24px; }
+.journal-day:last-child { margin-bottom:0; }
+.journal-day-label { font-size:11.5px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:10px; padding-left:2px; }
+.journal-entry { padding:16px 18px; border-radius:16px; margin-bottom:10px; background:var(--mood-tint, #f6f8fb); }
+.journal-entry:last-child { margin-bottom:0; }
+.journal-top { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.mood-badge { display:inline-flex; align-items:center; gap:7px; font-weight:800; font-size:13.5px; color:var(--mood-colour, var(--ink)); }
+.mood-badge .mood-dot { width:8px; height:8px; }
+.journal-note { margin:8px 0 0; font-size:13.5px; color:var(--ink-soft); line-height:1.55; white-space:pre-wrap; }
+.journal-note.muted { color:var(--muted); font-style:italic; }
 
 /* list rows (shares, appointments) */
 .lrow { display:flex; align-items:center; gap:14px; padding:14px; border:1px solid var(--line); border-radius:14px; margin-bottom:10px; }

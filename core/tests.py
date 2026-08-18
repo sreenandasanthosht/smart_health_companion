@@ -234,6 +234,40 @@ class ConsentTests(TestCase):
         self.assertTrue(ConsentGrant.objects.filter(patient=self.patient, recipient=other).exists())
 
 
+class MentalHealthCalendarTests(TestCase):
+    """The mood journal's calendar view -- month grid, navigation, and the
+    no-emoji requirement (a past version of this page used emoji per-mood
+    icons; this guards against that regressing back in)."""
+
+    def setUp(self):
+        self.patient = make('cal-patient@example.com', User.Role.PATIENT)
+        self.client.force_login(self.patient)
+
+    def test_calendar_marks_a_logged_day_with_its_mood_colour(self):
+        today = timezone.localdate()
+        MoodLog.objects.create(patient=self.patient, date=today, mood='Calm', note='')
+        resp = self.client.get(reverse('health_mental_health'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'cal-mood-dot')
+        self.assertContains(resp, '#0d9488')  # Calm's colour
+
+    def test_calendar_handles_an_invalid_month_param_without_crashing(self):
+        resp = self.client.get(reverse('health_mental_health'), {'month': 'not-a-month'})
+        self.assertEqual(resp.status_code, 200)
+        resp2 = self.client.get(reverse('health_mental_health'), {'month': '2026-13'})
+        self.assertEqual(resp2.status_code, 200)
+
+    def test_month_navigation_links_are_present(self):
+        resp = self.client.get(reverse('health_mental_health'))
+        self.assertContains(resp, '?month=')
+
+    def test_page_never_renders_an_emoji_character(self):
+        MoodLog.objects.create(patient=self.patient, mood='Anxious', note='a note')
+        resp = self.client.get(reverse('health_mental_health'))
+        content = resp.content.decode()
+        self.assertFalse(any(ord(ch) >= 0x1F000 for ch in content))
+
+
 class ProviderFlowTests(TestCase):
     def setUp(self):
         self.patient = make('pp@example.com', User.Role.PATIENT)
@@ -630,7 +664,7 @@ class CareLoopTests(TestCase):
         self.patient = make('loop-patient@example.com', User.Role.PATIENT)
         self.provider = make('loop-provider@example.com', User.Role.PROVIDER)
         self.profile = ProviderProfile.objects.create(
-            user=self.provider, provider_type=ProviderProfile.ProviderType.DOCTOR,
+            user=self.provider, provider_type=ProviderProfile.ProviderType.CLINIC,
             specialty='Cardiology', clinic_name='Loop Clinic')
         self.profile.approve()
         self.appt = Appointment.objects.create(
@@ -680,7 +714,7 @@ class CareLoopTests(TestCase):
     def test_provider_cannot_open_a_snapshot_for_someone_elses_appointment(self):
         other_provider = make('loop-other-provider@example.com', User.Role.PROVIDER)
         ProviderProfile.objects.create(
-            user=other_provider, provider_type=ProviderProfile.ProviderType.DOCTOR).approve()
+            user=other_provider, provider_type=ProviderProfile.ProviderType.CLINIC).approve()
         self.client.force_login(other_provider)
         resp = self.client.get(reverse('provider_previsit_snapshot', args=[self.appt.id]))
         self.assertEqual(resp.status_code, 404)
@@ -751,3 +785,131 @@ class CareLoopTests(TestCase):
         })
         new_appts = Appointment.objects.exclude(pk=self.appt.pk)
         self.assertTrue(any(timezone.localtime(a.scheduled_for).date() == day for a in new_appts))
+
+
+class DataScienceTests(TestCase):
+    """
+    Phase 5 (task 4.1-4.7) -- the synthetic cohort generator and the
+    recommendation engine built on top of it. Kept to a small cohort so
+    the suite stays fast; the numbers themselves are not meaningful at
+    this size, only the mechanics being tested are.
+    """
+
+    def _generate(self, patients=6, days=20, seed=7, reset=False):
+        from django.core.management import call_command
+        call_command('generate_cohort', patients=patients, days=days, seed=seed, reset=reset, verbosity=0)
+
+    def test_generate_cohort_creates_the_expected_number_of_patients(self):
+        from datascience.models import SyntheticPatient
+        self._generate(patients=6, days=15, seed=3)
+        self.assertEqual(SyntheticPatient.objects.count(), 6)
+
+    def test_generate_cohort_is_reproducible_under_a_fixed_seed(self):
+        from datascience.models import SyntheticPatient
+        self._generate(patients=4, days=10, seed=99)
+        first_run = list(
+            SyntheticPatient.objects.order_by('id')
+            .values_list('sleep_tendency', 'adherence_tendency', 'activity_tendency',
+                          'hydration_tendency', 'engagement_tendency', 'chronic_hypertension',
+                          'chronic_diabetes', 'age')
+        )
+        self._generate(patients=4, days=10, seed=99, reset=True)
+        second_run = list(
+            SyntheticPatient.objects.order_by('id')
+            .values_list('sleep_tendency', 'adherence_tendency', 'activity_tendency',
+                          'hydration_tendency', 'engagement_tendency', 'chronic_hypertension',
+                          'chronic_diabetes', 'age')
+        )
+        self.assertEqual(first_run, second_run)
+
+    def test_generate_cohort_without_reset_leaves_existing_cohort_untouched(self):
+        from datascience.models import SyntheticPatient
+        self._generate(patients=5, days=10, seed=1)
+        self._generate(patients=9, days=10, seed=2, reset=False)  # should be a no-op
+        self.assertEqual(SyntheticPatient.objects.count(), 5)
+
+    def test_no_patient_appears_in_both_a_fold_train_and_test_split(self):
+        from sklearn.model_selection import GroupKFold
+
+        from datascience.recommend import build_training_table
+        self._generate(patients=8, days=15, seed=11)
+        X, _y_by_candidate, groups = build_training_table()
+
+        # One feature row per synthetic patient -- a precondition for any
+        # patient-grouped split to be leak-free.
+        self.assertEqual(len(groups), len(set(groups)))
+
+        gkf = GroupKFold(n_splits=4)
+        for train_idx, test_idx in gkf.split(X, groups=groups):
+            train_patients = {groups[i] for i in train_idx}
+            test_patients = {groups[i] for i in test_idx}
+            self.assertEqual(train_patients & test_patients, set())
+
+    def test_recommender_trains_and_predicts_without_error(self):
+        from datascience.recommend import CANDIDATES, recommend_for_patient, train_recommender
+        self._generate(patients=8, days=25, seed=21)
+        models = train_recommender()
+        self.assertEqual(set(models.keys()), set(CANDIDATES.keys()))
+
+        # A real (non-synthetic) patient with some logged data.
+        patient = make('ds-patient@example.com', User.Role.PATIENT)
+        VitalRecord.objects.create(patient=patient, bp_systolic=118, bp_diastolic=76)
+        LifestyleLog.objects.create(patient=patient, date=timezone.localdate(),
+                                     sleep_hours=5.0, water_litres=1.0, steps=2000)
+
+        recs = recommend_for_patient(patient)
+        self.assertLessEqual(len(recs), 3)
+        for r in recs:
+            self.assertIn(r['key'], CANDIDATES)
+            self.assertTrue(r['title'])
+            self.assertTrue(r['reason'])
+
+    def test_recommender_falls_back_gracefully_with_no_trained_model(self):
+        # No generate_cohort / train_recommender call in this test -- the
+        # dashboard must never break just because the model hasn't been
+        # trained yet on a fresh checkout of the project.
+        from datascience.recommend import recommend_for_patient
+        patient = make('ds-fresh@example.com', User.Role.PATIENT)
+        LifestyleLog.objects.create(patient=patient, date=timezone.localdate(),
+                                     sleep_hours=4.5, water_litres=0.8, steps=1500)
+        recs = recommend_for_patient(patient)  # should use the rule-based fallback, not raise
+        self.assertIsInstance(recs, list)
+
+    def test_recommendation_engine_never_reads_or_mentions_mood_data(self):
+        from datascience.features import FEATURE_ORDER
+        from datascience.recommend import CANDIDATES
+        self.assertNotIn('mood', [f.lower() for f in FEATURE_ORDER])
+        for cfg in CANDIDATES.values():
+            self.assertNotIn('mood', cfg['title'].lower())
+
+    def test_suggestions_are_patient_only_and_never_reach_a_provider_view(self):
+        self._generate(patients=6, days=15, seed=5)
+        from django.core.management import call_command
+        call_command('train_models', verbosity=0)
+
+        patient = make('ds-loop-patient@example.com', User.Role.PATIENT)
+        provider = make('ds-loop-provider@example.com', User.Role.PROVIDER)
+        profile = ProviderProfile.objects.create(
+            user=provider, provider_type=ProviderProfile.ProviderType.CLINIC,
+            specialty='Cardiology', clinic_name='DS Test Clinic')
+        profile.approve()
+        appt = Appointment.objects.create(
+            patient=patient, provider=profile,
+            scheduled_for=timezone.now() + datetime.timedelta(days=2),
+            status=Appointment.Status.CONFIRMED,
+        )
+        LifestyleLog.objects.create(patient=patient, date=timezone.localdate(),
+                                     sleep_hours=4.0, water_litres=0.8, steps=1200)
+
+        self.client.force_login(patient)
+        self.client.post(reverse('provider_previsit_share'), {'appointment_id': appt.id})
+
+        self.client.force_login(provider)
+        resp = self.client.get(reverse('provider_previsit_snapshot', args=[appt.id]))
+        self.assertNotIn('suggestions', resp.context)
+        self.assertNotContains(resp, 'Suggestions for you')
+
+        # But the patient's own dashboard does show them.
+        self.client.force_login(patient)
+        resp = self.client.get(reverse('health_dashboard'))
+        self.assertContains(resp, 'Suggestions for you')

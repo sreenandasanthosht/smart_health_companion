@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'core',
     'adminpanel',
     'nursing',
+    'datascience',
 ]
 
 MIDDLEWARE = [
