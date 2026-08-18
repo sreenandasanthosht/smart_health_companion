@@ -75,6 +75,14 @@
           <div class="big">{{ next_appointment.scheduled_for|date:"j M" }}</div>
           <div class="meta">{{ next_appointment.scheduled_for|date:"g:i A" }}</div>
           <div class="meta">{{ next_appointment.provider.display_name }}</div>
+          {% if next_appointment.status == 'CONFIRMED' %}
+          <form method="post" action="{% url 'provider_previsit_share' %}" style="margin-top:8px;">
+            {% csrf_token %}
+            <input type="hidden" name="appointment_id" value="{{ next_appointment.id }}">
+            <input type="hidden" name="next" value="{% url 'health_dashboard' %}">
+            <button type="submit" class="btn btn-ghost" style="padding:6px 10px;font-size:12px;">Share pre-visit snapshot</button>
+          </form>
+          {% endif %}
           {% else %}
           <div class="big">None</div>
           <div class="meta">Nothing booked yet</div>
@@ -176,6 +184,44 @@
             {% endfor %}
           </div>
         </div>
+
+        {% if care_plans %}
+        <div class="panel">
+          <div class="p-title"><svg class="ic"><use href="#i-target"/></svg> Care Plans from Your Provider</div>
+          <div class="p-body">
+            {% for plan in care_plans %}
+            <div class="goal">
+              <div class="g-top"><svg class="ic" style="color:{% if plan.progress.on_target %}#22c55e{% else %}#f59e0b{% endif %};"><use href="#i-target"/></svg>
+                <span class="g-name">{{ plan.get_metric_display }}</span>
+                <span class="g-val">{% if plan.progress %}{{ plan.progress.current_value|floatformat:1 }} (target {{ plan.target_value|floatformat:1 }}){% else %}No data yet{% endif %}</span></div>
+              {% if plan.progress %}
+              <div class="bar"><span style="width:{% if plan.progress.on_target %}100{% else %}50{% endif %}%;background:{% if plan.progress.on_target %}#22c55e{% else %}#f59e0b{% endif %};"></span></div>
+              <div class="hint">{{ plan.progress.explanation }} &mdash; set by {{ plan.provider.display_name }}</div>
+              {% else %}
+              <div class="hint">Log this metric to see progress against the target set by {{ plan.provider.display_name }}.</div>
+              {% endif %}
+              {% if plan.note %}<div class="hint">{{ plan.note }}</div>{% endif %}
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if suggestions %}
+        <div class="panel">
+          <div class="p-title"><svg class="ic"><use href="#i-sparkles"/></svg> Suggestions for you</div>
+          <div class="p-body">
+            <p style="color:var(--muted);font-size:12.5px;margin:0 0 12px;">Based on your own recent logs, not a diagnosis &mdash; lifestyle and adherence nudges only.</p>
+            {% for s in suggestions %}
+            <div class="goal">
+              <div class="g-top"><svg class="ic" style="color:#0d9488;"><use href="#i-sparkles"/></svg>
+                <span class="g-name">{{ s.title }}</span></div>
+              <div class="hint">{{ s.reason }}</div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
 
         <div class="panel">
           <div class="p-title"><svg class="ic"><use href="#i-target"/></svg> Today's Goals <a class="more" href="{% url 'health_lifestyle' %}">Log <svg class="ic"><use href="#i-arrow-right"/></svg></a></div>

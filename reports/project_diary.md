@@ -242,3 +242,133 @@ separately in `reports/extraction_accuracy.md`.
 
 ---
 
+## 2026-08-04 — Caregiver security (Terese's branch merged in)
+**Who:** Terese
+**Phase:** unplanned, alongside Phase 2/3
+
+**Done:** `CaregiverInvite`, `Notification` and `TrustedDevice` models;
+invite-code-or-email-or-CareNest-ID resolution for linking a caregiver to a
+patient (`accounts/linking.py`); new-device sign-in approval for caregivers,
+gated on `PlatformSettings.caregiver_device_approval_required`
+(`accounts/devices.py`); a `Super Admin` distinction on top of `Admin`.
+
+**Why:** Not part of the original phase plan — this was built independently
+and arrived via `git pull`. Landed cleanly: migrations apply in sequence
+(`accounts.0006`–`0008`), all tests pass, no conflicts with Phase 2/3 work.
+
+**Blocked / open:** These features are not yet reflected in `docs/erd.md`,
+`docs/use_cases.md` or the task tracker, which still describe the system as
+of Phase 1. Needs a documentation catch-up pass before the report is written.
+
+---
+
+## 2026-08-05 — MySQL, a shared live instance, and Phase 3: Provider Care Loop
+**Who:** Sreenanda
+**Phase:** 3
+
+**Done, infrastructure:**
+- Fixed a Windows-only crash: `%-d` / `%-I` strftime flags (used to drop a
+  leading zero) work on Linux/macOS but raise `ValueError` on Windows, which
+  is exactly the kind of bug that survives testing on the developer's own
+  machine and only shows up after a `git pull` onto a different one. Replaced
+  with a `_friendly_datetime()` helper built from plain arithmetic.
+- Switched the running app from SQLite to the MySQL database the project was
+  designed around (`USE_SQLITE=0`); resolved a driver install and a root
+  password mismatch along the way. All 105 tests passed against MySQL.
+- Added `CSRF_TRUSTED_ORIGINS`, read from `.env`, which the project had never
+  needed before because it had never been reached from any host other than
+  `localhost`.
+- App made temporarily reachable to both project members at once via a
+  Cloudflare quick tunnel (`cloudflared`) pointed at the MySQL-backed local
+  server — same running app, same database, both members see each other's
+  changes live. No separate deployment, no second database to keep in sync.
+
+**Done, Phase 3 — Provider Care Loop:**
+- `ProviderAvailability` (weekly recurring hours) and `CarePlan` (one metric,
+  one target, a review date, a note) models.
+- Pre-visit snapshot (`previsit_snapshot`): shows a provider a patient's
+  recent vitals, medication adherence, active care plans and nursing
+  escalations from the last 30 days — but only for scopes the patient has
+  actually granted, never because an appointment merely exists. A scope not
+  granted renders an explicit "not shared" panel. Every view (and every
+  refusal) is written to the audit log.
+- One-click "share a pre-visit snapshot" action for patients: grants vitals +
+  medications only, expiring 24 hours after the appointment.
+- Care plan creation restricted to patients a provider has actually had an
+  appointment with; progress is computed from the patient's own real data
+  (`CarePlan.progress()`), returning `None` rather than a guessed value when
+  there isn't enough data yet. Shown on the patient dashboard as a goal bar.
+- Booking now validated against a provider's `ProviderAvailability`, if any
+  is set; providers with no configured hours remain bookable any time.
+- 10 new tests (`CareLoopTests`), covering consent-gated visibility, the
+  mental-health exclusion holding under this new view, cross-provider
+  appointment isolation, audit logging, and both availability outcomes.
+
+**Why:** The pre-visit snapshot is the clearest answer to "why does a patient
+need this app when they already have a doctor" — the provider sees three
+months of trend data instead of one recalled number, and only what the
+patient chose to share.
+
+**Next:** Phase 4 — Monitoring, Alerts & Ephemeral Sharing.
+
+---
+
+## 2026-08-10 — Recommendation engine (Phase 5, task 4.5, started ahead of Phase 4)
+**Who:** Sreenanda
+**Phase:** 5 (data science) — the recommendation engine specifically, done
+out of order at request; the other four Phase 5 models and Phase 4 (alerts)
+are still pending.
+
+**Done:**
+- New `datascience` app. `SyntheticPatient` model marks every fake patient
+  used for training/evaluation (`@carenest.synthetic` email), so real users
+  are never touched by any of this.
+- `generate_cohort` management command: synthetic patients (100 by default),
+  each with 60-120 days of fake vitals, medication doses, lifestyle logs and
+  a few mood check-ins, shaped by five hidden per-patient "tendency" floats
+  (sleep, adherence, activity, hydration, engagement). Fixed-seed
+  reproducible; assumptions written to `reports/synthetic_data_assumptions.md`
+  on every run.
+- `datascience/features.py`: turns a patient's last-14-days logs into a
+  feature vector — the same computation for a synthetic training patient and
+  a real one at prediction time.
+- `datascience/recommend.py`: the engine itself, a RULE-PLUS-MODEL hybrid.
+  A rule decides whether a suggestion is even eligible (backed by the
+  patient's own numbers, matching the thresholds already in
+  `health/analytics.py`); a `RandomForestClassifier` per suggestion type
+  (trained on the synthetic cohort) ranks the eligible ones. Falls back to a
+  plain rule-based score if no model has been trained yet, so a fresh
+  checkout never breaks. Returns at most 3 suggestions, each with the
+  concrete numbers behind it. Lifestyle/adherence nudges only — no clinical
+  instructions, and MoodLog is never read.
+- `datascience/evaluate.py` + `train_models` command: 5-fold **grouped**
+  cross-validation, split by patient (never by row), metrics written to
+  `datascience/artifacts/metrics.json` and a bar chart to
+  `datascience/artifacts/plots/`.
+- Admin-only model performance page at `/datascience/analytics/`.
+- Patient dashboard shows a "Suggestions for you" panel — patient-facing
+  only, confirmed by test to never reach a provider's pre-visit snapshot.
+- 8 new tests (`DataScienceTests`): cohort generation count and
+  reproducibility, no patient spans a fold's train/test split, model
+  trains and predicts without error, graceful fallback with no trained
+  model, no mood data anywhere in the engine, suggestions never leak to a
+  provider view.
+
+**Why this order:** requested directly, ahead of the plan's own sequencing
+(Phase 4 first). The recommendation engine only depends on Phase 0 data
+models, not on the alert engine, so nothing here was blocked by skipping
+ahead — Phase 4 and the other four Phase 5 models are still open.
+
+**Open follow-up:** run `python manage.py generate_cohort` then
+`python manage.py train_models` locally to get real metrics (the ones
+produced during development used a 6-8 patient cohort for test speed and
+are not meaningful). Read `datascience/artifacts/metrics.json` critically —
+anything above ~0.95 on a small synthetic cohort is more likely a leak than
+genuine skill. The CRISP-DM write-up for this model (task 4.8) is still
+needed in `reports/crispdm/`.
+
+**Next:** Phase 4 — Monitoring, Alerts & Ephemeral Sharing (still pending),
+or the remaining four Phase 5 models, whichever the team picks up next.
+
+---
+

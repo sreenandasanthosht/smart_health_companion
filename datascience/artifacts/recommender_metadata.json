@@ -1,0 +1,21 @@
+{
+  "feature_order": [
+    "avg_sleep_hours",
+    "avg_water_litres",
+    "avg_steps",
+    "missed_dose_rate",
+    "vitals_logged_14d",
+    "avg_bp_systolic",
+    "high_bp_ratio",
+    "lifestyle_days_logged",
+    "age"
+  ],
+  "candidates": [
+    "SLEEP",
+    "ADHERENCE",
+    "ACTIVITY",
+    "HYDRATION",
+    "VITALS_LOGGING"
+  ],
+  "trained_on_patients": 6
+}

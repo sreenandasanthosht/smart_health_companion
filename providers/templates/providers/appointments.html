@@ -30,6 +30,15 @@
                 {% if a.reason %}<div class="s">{{ a.reason }}</div>{% endif %}
               </div>
               <span class="pill {% if a.status == 'CONFIRMED' %}ok{% else %}warn{% endif %}">{{ a.get_status_display }}</span>
+              {% if a.status == 'CONFIRMED' %}
+              <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="share_snapshot">
+                <input type="hidden" name="appointment_id" value="{{ a.id }}">
+                <input type="hidden" name="next" value="{% url 'provider_appointments' %}">
+                <button type="submit" formaction="{% url 'provider_previsit_share' %}" class="btn btn-ghost" style="padding:7px 12px;font-size:12.5px;white-space:nowrap;">Share snapshot</button>
+              </form>
+              {% endif %}
               <form method="post">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="cancel">

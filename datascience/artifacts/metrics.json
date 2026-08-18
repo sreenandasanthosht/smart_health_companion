@@ -1,0 +1,161 @@
+{
+  "trained_on_patients": 6,
+  "feature_order": [
+    "avg_sleep_hours",
+    "avg_water_litres",
+    "avg_steps",
+    "missed_dose_rate",
+    "vitals_logged_14d",
+    "avg_bp_systolic",
+    "high_bp_ratio",
+    "lifestyle_days_logged",
+    "age"
+  ],
+  "candidates": {
+    "SLEEP": {
+      "n_folds": 5,
+      "accuracy": {
+        "mean": 0.8,
+        "std": 0.4
+      },
+      "precision": {
+        "mean": 0.4,
+        "std": 0.49
+      },
+      "recall": {
+        "mean": 0.4,
+        "std": 0.49
+      },
+      "f1": {
+        "mean": 0.4,
+        "std": 0.49
+      },
+      "roc_auc": {
+        "mean": null,
+        "std": null
+      },
+      "confusion_matrix": {
+        "tp": 2,
+        "tn": 3,
+        "fp": 0,
+        "fn": 1
+      }
+    },
+    "ADHERENCE": {
+      "n_folds": 5,
+      "accuracy": {
+        "mean": 0.5,
+        "std": 0.447
+      },
+      "precision": {
+        "mean": 0.5,
+        "std": 0.447
+      },
+      "recall": {
+        "mean": 0.6,
+        "std": 0.49
+      },
+      "f1": {
+        "mean": 0.533,
+        "std": 0.452
+      },
+      "roc_auc": {
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "confusion_matrix": {
+        "tp": 3,
+        "tn": 0,
+        "fp": 2,
+        "fn": 1
+      }
+    },
+    "ACTIVITY": {
+      "n_folds": 5,
+      "accuracy": {
+        "mean": 0.8,
+        "std": 0.4
+      },
+      "precision": {
+        "mean": 0.4,
+        "std": 0.49
+      },
+      "recall": {
+        "mean": 0.4,
+        "std": 0.49
+      },
+      "f1": {
+        "mean": 0.4,
+        "std": 0.49
+      },
+      "roc_auc": {
+        "mean": null,
+        "std": null
+      },
+      "confusion_matrix": {
+        "tp": 2,
+        "tn": 3,
+        "fp": 0,
+        "fn": 1
+      }
+    },
+    "HYDRATION": {
+      "n_folds": 5,
+      "accuracy": {
+        "mean": 0.9,
+        "std": 0.2
+      },
+      "precision": {
+        "mean": 0.9,
+        "std": 0.2
+      },
+      "recall": {
+        "mean": 1.0,
+        "std": 0.0
+      },
+      "f1": {
+        "mean": 0.933,
+        "std": 0.133
+      },
+      "roc_auc": {
+        "mean": 0.5,
+        "std": 0.0
+      },
+      "confusion_matrix": {
+        "tp": 5,
+        "tn": 0,
+        "fp": 1,
+        "fn": 0
+      }
+    },
+    "VITALS_LOGGING": {
+      "n_folds": 5,
+      "accuracy": {
+        "mean": 0.6,
+        "std": 0.49
+      },
+      "precision": {
+        "mean": 0.2,
+        "std": 0.4
+      },
+      "recall": {
+        "mean": 0.2,
+        "std": 0.4
+      },
+      "f1": {
+        "mean": 0.2,
+        "std": 0.4
+      },
+      "roc_auc": {
+        "mean": null,
+        "std": null
+      },
+      "confusion_matrix": {
+        "tp": 1,
+        "tn": 2,
+        "fp": 2,
+        "fn": 1
+      }
+    }
+  }
+}

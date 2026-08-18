@@ -1,18 +1,7 @@
-# Normalise line endings.
+# Normalize line endings.
 * text=auto
 
 # Binary files
-*.png binary
-*.jpg binary
-*.jpeg binary
-*.gif binary
-*.ico binary
-*.pdf binary
-*.docx binary
-*.xlsx binary
-*.pptx binary
-*.gz binary
-*.zip binary
-*.sqlite3 binary
-
 *.csv binary
+*.xlsx binary
+*.docx binary

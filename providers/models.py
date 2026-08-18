@@ -270,6 +270,122 @@ class Appointment(models.Model):
         return f"{self.patient} with {self.provider} on {self.scheduled_for:%d %b %Y}"
 
 
+class ProviderAvailability(models.Model):
+    """
+    A weekly recurring window a provider is bookable in.
+
+    Deliberately a recurring pattern (weekday + start/end time) rather than
+    individually generated bookable slots -- the Phase 3 plan flags that as
+    the simplest thing that works for this project, and slot generation
+    adds complexity (holidays, exceptions, timezone edge cases) that isn't
+    needed to demonstrate the feature.
+    """
+    class Weekday(models.IntegerChoices):
+        MONDAY = 0, 'Monday'
+        TUESDAY = 1, 'Tuesday'
+        WEDNESDAY = 2, 'Wednesday'
+        THURSDAY = 3, 'Thursday'
+        FRIDAY = 4, 'Friday'
+        SATURDAY = 5, 'Saturday'
+        SUNDAY = 6, 'Sunday'
+
+    provider = models.ForeignKey(ProviderProfile, on_delete=models.CASCADE, related_name='availability')
+    weekday = models.IntegerField(choices=Weekday.choices)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    slot_minutes = models.PositiveIntegerField(default=30)
+
+    class Meta:
+        ordering = ['weekday', 'start_time']
+        verbose_name_plural = 'Provider availability'
+
+    def covers(self, when):
+        """True if the given aware datetime falls within this window's day and time."""
+        local = timezone.localtime(when)
+        return local.weekday() == self.weekday and self.start_time <= local.time() < self.end_time
+
+    def __str__(self):
+        return f"{self.provider} -- {self.get_weekday_display()} {self.start_time:%H:%M}-{self.end_time:%H:%M}"
+
+
+class CarePlan(models.Model):
+    """
+    A small, measurable target a provider sets for a patient after a visit.
+
+    Kept deliberately narrow per the Phase 3 plan: one metric, one target,
+    a review date and a note -- not a full clinical care plan. `progress()`
+    reads the patient's own recent data and never invents a number; it
+    returns None when there isn't enough data to say anything.
+    """
+    class Metric(models.TextChoices):
+        BP_SYSTOLIC = 'BP_SYSTOLIC', 'Blood pressure (systolic)'
+        WEIGHT = 'WEIGHT', 'Weight'
+        STEPS = 'STEPS', 'Daily steps'
+        SLEEP_HOURS = 'SLEEP_HOURS', 'Sleep hours'
+        BLOOD_SUGAR = 'BLOOD_SUGAR', 'Blood sugar'
+
+    class Direction(models.TextChoices):
+        BELOW = 'BELOW', 'At or below target'
+        ABOVE = 'ABOVE', 'At or above target'
+        WITHIN = 'WITHIN', 'Within range of target'
+
+    patient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='care_plans')
+    provider = models.ForeignKey(ProviderProfile, on_delete=models.CASCADE, related_name='care_plans')
+    created_at = models.DateTimeField(auto_now_add=True)
+    metric = models.CharField(max_length=20, choices=Metric.choices)
+    target_value = models.DecimalField(max_digits=6, decimal_places=1)
+    target_direction = models.CharField(max_length=10, choices=Direction.choices, default=Direction.BELOW)
+    review_date = models.DateField(null=True, blank=True)
+    note = models.TextField(blank=True)
+    active = models.BooleanField(default=True)
+
+    def _latest_value(self):
+        """The patient's most recent reading for this plan's metric, or None."""
+        from health.models import LifestyleLog, VitalRecord
+
+        if self.metric == self.Metric.BP_SYSTOLIC:
+            row = VitalRecord.objects.filter(patient=self.patient).first()
+            return row.bp_systolic if row else None
+        if self.metric == self.Metric.WEIGHT:
+            row = VitalRecord.objects.filter(patient=self.patient, weight_kg__isnull=False).first()
+            return row.weight_kg if row else None
+        if self.metric == self.Metric.BLOOD_SUGAR:
+            row = VitalRecord.objects.filter(patient=self.patient, blood_sugar__isnull=False).first()
+            return row.blood_sugar if row else None
+        if self.metric == self.Metric.STEPS:
+            row = LifestyleLog.objects.filter(patient=self.patient, steps__isnull=False).first()
+            return row.steps if row else None
+        if self.metric == self.Metric.SLEEP_HOURS:
+            row = LifestyleLog.objects.filter(patient=self.patient, sleep_hours__isnull=False).first()
+            return row.sleep_hours if row else None
+        return None
+
+    def progress(self):
+        """
+        {'current_value', 'on_target', 'explanation'} built from real data,
+        or None when there is nothing recorded yet for this metric --
+        never a guessed number.
+        """
+        current = self._latest_value()
+        if current is None:
+            return None
+        current = float(current)
+        target = float(self.target_value)
+        if self.target_direction == self.Direction.BELOW:
+            on_target = current <= target
+            explanation = f"{current:g} is {'at or below' if on_target else 'above'} the target of {target:g}."
+        elif self.target_direction == self.Direction.ABOVE:
+            on_target = current >= target
+            explanation = f"{current:g} is {'at or above' if on_target else 'below'} the target of {target:g}."
+        else:
+            tolerance = max(target * 0.1, 1)
+            on_target = abs(current - target) <= tolerance
+            explanation = f"{current:g} is {'within' if on_target else 'outside'} range of the target {target:g}."
+        return {'current_value': current, 'on_target': on_target, 'explanation': explanation}
+
+    def __str__(self):
+        return f"{self.get_metric_display()} target for {self.patient} by {self.provider}"
+
 # ==========================================================================
 # Shared across every service group
 # ==========================================================================

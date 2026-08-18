@@ -23,63 +23,175 @@
         <div class="c-body">This is a hard exclusion in the consent framework, not a setting: there is no way to grant anyone access to this page's data.</div>
       </div>
 
-      <div class="grid g-8-4">
-        <div>
-          <div class="panel" style="margin-bottom:20px;"><div class="p-body tall">
-            <h3 class="p-h"><svg class="ic"><use href="#i-activity"/></svg> Your entries {% if total_entries %}<span class="pill muted">{{ total_entries }}</span>{% endif %}</h3>
-            {% for e in entries %}
-            <div class="lrow" style="border-radius:12px;">
-              <div class="grow"><div class="t">{{ e.mood }}</div>
-                {% if e.note %}<div class="s">{{ e.note }}</div>{% endif %}</div>
-              <span class="s" style="white-space:nowrap;">{{ e.date|date:"j M Y" }}</span>
+      <div class="grid g-2">
+        <div class="checkin-card">
+          <div class="checkin-head">
+            <svg class="ic"><use href="#i-heart"/></svg>
+            <div>
+              <div class="checkin-title">What do you feel?</div>
+              <div class="checkin-sub">Pick a mood, then write as much or as little as you like.</div>
             </div>
-            {% empty %}
-            <p style="color:var(--muted);font-size:13.5px;">No entries yet. Use the check-in on the right whenever you'd like.</p>
-            {% endfor %}
-          </div></div>
-
-          {% if mood_counts %}
-          <div class="panel"><div class="p-body tall">
-            <h3 class="p-h"><svg class="ic"><use href="#i-target"/></svg> How you've been feeling</h3>
-            {% for mood, count in mood_counts %}
-            <div class="goal">
-              <div class="g-top"><span class="g-name">{{ mood }}</span><span class="g-val">{{ count }}</span></div>
-              <div class="bar"><span style="width:{% widthratio count total_entries 100 %}%;background:#8b5cf6;"></span></div>
-            </div>
-            {% endfor %}
-          </div></div>
-          {% endif %}
-        </div>
-
-        <div class="panel"><div class="p-body tall">
-          <h3 class="p-h"><svg class="ic"><use href="#i-heart"/></svg> How are you feeling today?</h3>
+          </div>
           <form method="post" id="mood-form">
             {% csrf_token %}
             <input type="hidden" name="mood" id="mood-value">
             <div class="mood-row">
               {% for m in mood_options %}
-              <button type="button" class="mood" data-mood="{{ m }}">{{ m }}</button>
+              <button type="button" class="mood" data-mood="{{ m.key }}"
+                      style="--mood-colour:{{ m.colour }};--mood-tint:{{ m.tint }};">
+                <span class="mood-dot"></span>{{ m.key }}
+                <svg class="ic mood-check"><use href="#i-check"/></svg>
+              </button>
               {% endfor %}
             </div>
-            <div class="field"><label>Notes (optional)</label>
-              <textarea class="inp" name="note" rows="3" placeholder="Anything you'd like to note..."></textarea></div>
-            <button type="submit" class="btn btn-purple block">Save privately</button>
-            <div class="hint">Pick a mood first, then save.</div>
+            <textarea class="inp checkin-note" name="note" rows="3" placeholder="What's behind that feeling? (optional)"></textarea>
+            <div class="checkin-footer">
+              <span class="hint" id="mood-hint">Pick a mood first, then save.</span>
+              <button type="submit" class="btn btn-purple" id="mood-submit" disabled>Save privately</button>
+            </div>
           </form>
-          <script>
-            (function () {
-              var form = document.getElementById('mood-form');
-              var hidden = document.getElementById('mood-value');
-              form.querySelectorAll('.mood').forEach(function (btn) {
-                btn.addEventListener('click', function () {
-                  form.querySelectorAll('.mood').forEach(function (b) { b.classList.remove('active'); });
-                  btn.classList.add('active');
-                  hidden.value = btn.dataset.mood;
-                });
-              });
-            })();
-          </script>
-        </div></div>
+        </div>
+
+        <div class="dump-card">
+          <div class="checkin-head">
+            <svg class="ic bin-icon" id="bin-icon" viewBox="0 0 64 64">
+              <g class="bin-lid">
+                <rect x="14" y="14" width="36" height="6" rx="2" fill="currentColor"/>
+                <rect x="26" y="8" width="12" height="6" rx="2" fill="currentColor"/>
+              </g>
+              <path d="M18 22 L20 54 a4 4 0 0 0 4 4 h16 a4 4 0 0 0 4-4 L46 22 Z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/>
+              <line x1="26" y1="28" x2="27" y2="50" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+              <line x1="32" y1="28" x2="32" y2="50" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+              <line x1="38" y1="28" x2="37" y2="50" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+            </svg>
+            <div>
+              <div class="checkin-title">Mental dump</div>
+              <div class="checkin-sub">Get it out of your head. This box is never saved &mdash; not to CareNest, not even to your device.</div>
+            </div>
+          </div>
+          <textarea class="inp dump-textarea" id="dump-textarea" rows="4" placeholder="Type whatever's on your mind, then throw it away..."></textarea>
+          <div class="checkin-footer">
+            <span class="hint" id="dump-hint">Nothing you type here is ever sent anywhere.</span>
+            <button type="button" class="btn btn-ghost" id="dump-toss">Throw it away</button>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        (function () {
+          var form = document.getElementById('mood-form');
+          var hidden = document.getElementById('mood-value');
+          var submitBtn = document.getElementById('mood-submit');
+          var hint = document.getElementById('mood-hint');
+          form.querySelectorAll('.mood').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+              form.querySelectorAll('.mood').forEach(function (b) { b.classList.remove('active'); });
+              btn.classList.add('active');
+              hidden.value = btn.dataset.mood;
+              submitBtn.disabled = false;
+              hint.textContent = 'Feeling ' + btn.dataset.mood.toLowerCase() + ' — add a note if you like, then save.';
+            });
+          });
+        })();
+
+        (function () {
+          // The mental dump box is deliberately never submitted to the
+          // server -- there is no form, no fetch(), no POST here. "Throw it
+          // away" just clears the textarea in the browser after a short
+          // animation. Nothing typed here can be recovered afterwards, by
+          // CareNest or anyone else, because nothing here was ever sent.
+          var textarea = document.getElementById('dump-textarea');
+          var tossBtn = document.getElementById('dump-toss');
+          var bin = document.getElementById('bin-icon');
+          var hint = document.getElementById('dump-hint');
+
+          tossBtn.addEventListener('click', function () {
+            if (!textarea.value.trim()) {
+              textarea.focus();
+              return;
+            }
+            bin.classList.add('open');
+            textarea.classList.add('tossing');
+            hint.textContent = 'Gone. Nothing was saved.';
+            setTimeout(function () {
+              textarea.value = '';
+              textarea.classList.remove('tossing');
+              bin.classList.remove('open');
+            }, 420);
+            setTimeout(function () {
+              hint.textContent = 'Nothing you type here is ever sent anywhere.';
+            }, 2400);
+          });
+        })();
+      </script>
+
+      <div class="panel" style="margin-top:20px;"><div class="p-body tall">
+        <div class="cal-head">
+          <h3 class="p-h" style="margin:0;"><svg class="ic"><use href="#i-calendar"/></svg> Mood calendar &mdash; {{ calendar_month_label|date:"F Y" }}</h3>
+          <div class="cal-nav">
+            <a href="?month={{ calendar_prev_month }}" class="btn btn-ghost cal-nav-btn"><svg class="ic" style="transform:rotate(180deg);"><use href="#i-arrow-right"/></svg></a>
+            <a href="?month={{ calendar_next_month }}" class="btn btn-ghost cal-nav-btn"><svg class="ic"><use href="#i-arrow-right"/></svg></a>
+          </div>
+        </div>
+
+        <div class="cal-grid cal-grid-head">
+          {% for label in calendar_weekday_labels %}<div class="cal-weekday">{{ label }}</div>{% endfor %}
+        </div>
+        {% for week in calendar_weeks %}
+        <div class="cal-grid">
+          {% for day in week %}
+          <div class="cal-cell {% if not day.in_month %}outside{% endif %} {% if day.is_today %}today{% endif %}"
+               style="{% if day.meta %}--mood-colour:{{ day.meta.colour }};--mood-tint:{{ day.meta.tint }};{% endif %}">
+            <span class="cal-date">{{ day.date|date:"j" }}</span>
+            {% if day.mood %}<span class="cal-mood-dot" title="{{ day.mood }}"></span>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+
+        <div class="cal-legend">
+          {% for m in calendar_legend %}
+          <span class="cal-legend-item"><span class="mood-dot" style="background:{{ m.colour }};"></span>{{ m.key }}</span>
+          {% endfor %}
+        </div>
+      </div></div>
+
+      <div class="grid g-8-4" style="margin-top:20px;">
+        <div>
+          <div class="panel"><div class="p-body tall">
+            <h3 class="p-h"><svg class="ic"><use href="#i-activity"/></svg> Your journal {% if total_entries %}<span class="pill muted">{{ total_entries }}</span>{% endif %}</h3>
+
+            {% for day in days %}
+            <div class="journal-day">
+              <div class="journal-day-label">{% if day.label %}{{ day.label }}{% else %}{{ day.date|date:"l, j F" }}{% endif %}</div>
+              {% for e in day.entries %}
+              <div class="journal-entry" style="--mood-colour:{{ e.meta.colour }};--mood-tint:{{ e.meta.tint }};">
+                <div class="journal-top">
+                  <span class="mood-badge"><span class="mood-dot"></span>{{ e.mood }}</span>
+                </div>
+                {% if e.note %}<p class="journal-note">{{ e.note }}</p>{% else %}<p class="journal-note muted">No notes added.</p>{% endif %}
+              </div>
+              {% endfor %}
+            </div>
+            {% empty %}
+            <p style="color:var(--muted);font-size:13.5px;">No entries yet. Use the check-in above whenever you'd like.</p>
+            {% endfor %}
+          </div></div>
+        </div>
+
+        <div>
+          {% if mood_counts %}
+          <div class="panel"><div class="p-body tall">
+            <h3 class="p-h"><svg class="ic"><use href="#i-target"/></svg> How you've been feeling</h3>
+            {% for row in mood_counts %}
+            <div class="goal">
+              <div class="g-top"><span class="g-name">{{ row.mood }}</span><span class="g-val">{{ row.count }}</span></div>
+              <div class="bar"><span style="width:{% widthratio row.count total_entries 100 %}%;background:{{ row.meta.colour }};"></span></div>
+            </div>
+            {% endfor %}
+          </div></div>
+          {% endif %}
+        </div>
       </div>
 
 {% endblock %}

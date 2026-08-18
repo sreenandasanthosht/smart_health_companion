@@ -1,0 +1,112 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Pre-visit Snapshot &middot; CareNest{% endblock %}
+{% block sidebar %}{% include 'partials/_sidebar_provider.html' with active='dashboard' %}{% endblock %}
+
+{% block dashboard_content %}
+
+      <div class="page-head">
+        <span class="chip-role">Provider</span>
+        <h1>Pre-visit snapshot &middot; {{ patient.display_name }}</h1>
+        <div class="page-sub">Appointment on {{ appointment.scheduled_for|date:"D, j M Y - g:i A" }}. Only what {{ patient.display_name }} has chosen to share is shown here.</div>
+      </div>
+
+      {% if not can_see_vitals and not can_see_meds %}
+      <div class="callout danger">
+        <svg class="ic"><use href="#i-shield-alert"/></svg>
+        <div class="c-body"><strong>Nothing shared yet.</strong> {{ patient.display_name }} hasn't shared a pre-visit snapshot for this appointment. Ask them to use the "Share pre-visit snapshot" action on their appointments page or dashboard.</div>
+      </div>
+      {% endif %}
+
+      <div class="grid g-2">
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-heart"/></svg> Recent vitals</h3>
+          {% if can_see_vitals %}
+            {% if recent_vitals %}
+            <table class="dtable">
+              <thead><tr><th>When</th><th>BP</th><th>Sugar</th><th>Weight</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for v in recent_vitals %}
+                <tr>
+                  <td>{{ v.recorded_at|date:"j M, g:i A" }}</td>
+                  <td>{{ v.bp_systolic }}/{{ v.bp_diastolic }}</td>
+                  <td>{{ v.blood_sugar|default:"&mdash;" }}</td>
+                  <td>{{ v.weight_kg|default:"&mdash;" }} kg</td>
+                  <td><span class="pill {% if v.status == 'HIGH' %}danger{% elif v.status == 'WATCH' %}warn{% else %}ok{% endif %}">{{ v.get_status_display }}</span></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% else %}
+            <p style="color:var(--muted);font-size:13.5px;">No vitals recorded yet.</p>
+            {% endif %}
+          {% else %}
+          <div class="callout muted"><svg class="ic"><use href="#i-shield-alert"/></svg>
+            <div class="c-body">Vitals not shared for this visit.</div></div>
+          {% endif %}
+        </div></div>
+
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-pill"/></svg> Medications</h3>
+          {% if can_see_meds %}
+            <p style="color:var(--muted);font-size:13.5px;margin:0 0 12px;">Adherence over the last 14 days: <strong>{% if adherence is not None %}{{ adherence }}%{% else %}not enough data{% endif %}</strong></p>
+            {% if active_meds %}
+            <table class="dtable">
+              <thead><tr><th>Medicine</th><th>Dose</th><th>Schedule</th></tr></thead>
+              <tbody>
+                {% for m in active_meds %}
+                <tr><td>{{ m.name }}</td><td>{{ m.dose }}</td><td>{{ m.schedule }}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% else %}
+            <p style="color:var(--muted);font-size:13.5px;">No active medications.</p>
+            {% endif %}
+          {% else %}
+          <div class="callout muted"><svg class="ic"><use href="#i-shield-alert"/></svg>
+            <div class="c-body">Medications not shared for this visit.</div></div>
+          {% endif %}
+        </div></div>
+      </div>
+
+      {% if can_see_vitals or can_see_meds %}
+      <div class="grid g-2" style="margin-top:20px;">
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-target"/></svg> Active care plans</h3>
+          {% for plan in care_plans %}
+          <div class="goal">
+            <div class="g-top"><svg class="ic"><use href="#i-target"/></svg>
+              <span class="g-name">{{ plan.get_metric_display }}</span>
+              <span class="g-val">Target {{ plan.target_value|floatformat:1 }}</span></div>
+            {% if plan.progress %}<div class="hint">{{ plan.progress.explanation }}</div>{% endif %}
+            <div class="hint">Set by {{ plan.provider.display_name }}{% if plan.review_date %} &middot; review {{ plan.review_date|date:"j M Y" }}{% endif %}</div>
+          </div>
+          {% empty %}
+          <p style="color:var(--muted);font-size:13.5px;">No active care plans.</p>
+          {% endfor %}
+          <a href="{% url 'provider_care_plans' %}" class="link" style="margin-top:6px;display:inline-block;">Set a new care plan <svg class="ic"><use href="#i-arrow-right"/></svg></a>
+        </div></div>
+
+        <div class="panel"><div class="p-body tall">
+          <h3 class="p-h"><svg class="ic"><use href="#i-shield-alert"/></svg> Nursing escalations (last 30 days)</h3>
+          {% for visit in recent_escalations %}
+          <div class="lrow">
+            <span class="ri tint-orange" style="width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:0 0 36px;">
+              <svg class="ic"><use href="#i-shield-alert"/></svg></span>
+            <div class="grow">
+              <div class="t">{{ visit.visited_at|date:"j M Y, g:i A" }}</div>
+              <div class="s">{{ visit.escalation_reason|default:visit.notes|default:"No details recorded." }}</div>
+            </div>
+          </div>
+          {% empty %}
+          <p style="color:var(--muted);font-size:13.5px;">No escalations in the last 30 days.</p>
+          {% endfor %}
+        </div></div>
+      </div>
+      {% endif %}
+
+      <div class="callout mint" style="margin-top:20px;">
+        <svg class="ic"><use href="#i-check"/></svg>
+        <div class="c-body">This view was recorded in the audit log, naming the patient and exactly which scopes were seen.</div>
+      </div>
+
+{% endblock %}

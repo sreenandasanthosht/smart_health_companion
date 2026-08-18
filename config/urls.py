@@ -19,4 +19,5 @@ urlpatterns = [
     path('providers/', include('providers.urls')),
     path('admin-panel/', include('adminpanel.urls')),
     path('nursing/', include('nursing.urls')),
+    path('datascience/', include('datascience.urls')),
 ]

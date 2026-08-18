@@ -5,6 +5,7 @@ health, record sharing, and the caregiver's read-only view.
 Everything here reads and writes real database rows. Nothing on these
 pages is placeholder data any more.
 """
+import calendar
 import datetime
 from decimal import Decimal, InvalidOperation
 
@@ -28,11 +29,25 @@ from health import extraction
 from health import labvalues
 from health import schedules
 from health.models import (
-    ConsentGrant, DoseTime, ExtractedLabValue, ExtractedMedication, ExtractionJob,
-    HealthDocument, LabReport, LabResultValue, LifestyleLog, Medication,
-    MedicationDose, MoodLog, SCOPE_FIELDS, VitalRecord, consent_matrix, has_consent,
+    ConsentGrant,
+    DoseTime,
+    ExtractedLabValue,
+    ExtractedMedication,
+    ExtractionJob,
+    HealthDocument,
+    LabReport,
+    LabResultValue,
+    LifestyleLog,
+    Medication,
+    MedicationDose,
+    MoodLog,
+    SCOPE_FIELDS,
+    VitalRecord,
+    consent_matrix,
+    has_consent,
 )
-from providers.models import Appointment, ProviderProfile
+
+from providers.models import Appointment, CarePlan, ProviderProfile
 
 
 def _refill_label(medication):
@@ -44,6 +59,22 @@ def _refill_label(medication):
     if days_left == 0:
         return 'Today'
     return f"{days_left} days"
+
+
+def _friendly_datetime(value):
+    """
+    Format a datetime as e.g. "4 Aug at 6:05 PM".
+
+    Written without the %-d / %-I strftime flags: those strip leading zeros
+    on Linux/macOS but raise ValueError('Invalid format string') on Windows.
+    Building the no-leading-zero parts in Python keeps this working on any
+    operating system.
+    """
+    if not value:
+        return ''
+    dt = timezone.localtime(value)          # settings.TIME_ZONE, since USE_TZ=True
+    hour_12 = dt.hour % 12 or 12            # 0 -> 12 (midnight), 13 -> 1
+    return f'{dt.day} {dt:%b} at {hour_12}:{dt:%M} {dt:%p}'
 
 
 def _parse_decimal(raw):
@@ -191,8 +222,22 @@ def dashboard(request):
         'show_profile_prompt': patient.profile_completion() < 100,
         'pending_caregivers': CaregiverLink.objects.filter(
             patient=patient, status=CaregiverLink.Status.PENDING).select_related('caregiver'),
+        'care_plans': CarePlan.objects.filter(patient=patient, active=True).select_related('provider'),
+        # Rule-plus-model recommendation engine (task 4.5). Patient-facing
+        # only -- never routed into alerts, snapshots or any provider view.
+        # Wrapped defensively: a missing/untrained model artifact must
+        # degrade to "no suggestions shown", never break the dashboard.
+        'suggestions': _safe_suggestions(patient),
     }
     return render(request, 'health/dashboard.html', context)
+
+
+def _safe_suggestions(patient):
+    try:
+        from datascience.recommend import recommend_for_patient
+        return recommend_for_patient(patient)
+    except Exception:
+        return []
 
 
 # --------------------------------------------------------------------------
@@ -486,6 +531,20 @@ def lifestyle(request):
 # Mental health -- private, never shareable
 # --------------------------------------------------------------------------
 
+# No emoji -- a colour + a soft pastel tint per mood, in the style of a
+# calm, card-based mood tracker (think Flo's check-in screen): each mood
+# gets a distinct colour identity that shows up as a soft background tint
+# on its journal cards and a solid fill on the picker once selected.
+MOOD_META = {
+    'Good':     {'colour': '#16a34a', 'tint': '#e9f9ef'},
+    'Calm':     {'colour': '#0d9488', 'tint': '#e6f7f4'},
+    'Stressed': {'colour': '#d97706', 'tint': '#fdf2e3'},
+    'Low':      {'colour': '#475569', 'tint': '#eef1f5'},
+    'Anxious':  {'colour': '#dc2626', 'tint': '#fdecec'},
+}
+_DEFAULT_MOOD_META = {'colour': '#7c3aed', 'tint': '#f3effe'}
+
+
 @role_required(User.Role.PATIENT)
 def mental_health(request):
     if request.method == 'POST':
@@ -500,17 +559,101 @@ def mental_health(request):
             messages.success(request, 'Saved privately. Only you can see this.')
         return redirect('health_mental_health')
 
-    entries = MoodLog.objects.filter(patient=request.user)[:30]
+    entries = list(MoodLog.objects.filter(patient=request.user)[:30])
     counts = {}
     for e in entries:
         counts[e.mood] = counts.get(e.mood, 0) + 1
+        e.meta = MOOD_META.get(e.mood, _DEFAULT_MOOD_META)
+
+    # Group into a journal layout: one heading per day, entries for that day
+    # underneath it, newest day first (entries already come newest-first).
+    today = timezone.localdate()
+    yesterday = today - datetime.timedelta(days=1)
+    days = []
+    current_day = None
+    for e in entries:
+        if current_day is None or current_day['date'] != e.date:
+            if e.date == today:
+                label = 'Today'
+            elif e.date == yesterday:
+                label = 'Yesterday'
+            else:
+                # Formatted in the template (|date:"l, j F"), not with
+                # strftime here -- %-d style no-leading-zero flags crash on
+                # Windows, which is exactly how a past bug on this project
+                # slipped through on a non-Windows dev machine.
+                label = None
+            current_day = {'date': e.date, 'label': label, 'entries': []}
+            days.append(current_day)
+        current_day['entries'].append(e)
+
+    mood_options = [dict(key=key, **meta) for key, meta in MOOD_META.items()]
     context = {
-        'entries': entries,
-        'mood_options': ['Good', 'Calm', 'Stressed', 'Low', 'Anxious'],
-        'mood_counts': sorted(counts.items(), key=lambda kv: -kv[1]),
+        'days': days,
+        'mood_options': mood_options,
+        'mood_counts': [
+            {'mood': mood, 'count': count, 'meta': MOOD_META.get(mood, _DEFAULT_MOOD_META)}
+            for mood, count in sorted(counts.items(), key=lambda kv: -kv[1])
+        ],
         'total_entries': len(entries),
     }
+    context.update(_mood_calendar_context(request))
     return render(request, 'health/mental_health.html', context)
+
+
+def _mood_calendar_context(request):
+    """
+    Builds the data for a month-grid calendar with each day tinted by that
+    day's mood. `?month=YYYY-MM` navigates; an invalid/missing value falls
+    back to the current month rather than erroring.
+    """
+    today = timezone.localdate()
+    month_param = request.GET.get('month', '')
+    try:
+        year, month = (int(p) for p in month_param.split('-', 1))
+        first_of_month = datetime.date(year, month, 1)
+    except (ValueError, TypeError):
+        first_of_month = today.replace(day=1)
+
+    # Every mood logged in the visible month, last check-in of the day wins
+    # if there was more than one that day.
+    month_logs = MoodLog.objects.filter(
+        patient=request.user,
+        date__year=first_of_month.year, date__month=first_of_month.month,
+    ).order_by('date', 'id')
+    mood_by_date = {}
+    for log in month_logs:
+        mood_by_date[log.date] = log.mood
+
+    cal = calendar.Calendar(firstweekday=0)  # weeks start Monday
+    weeks = []
+    for week in cal.monthdatescalendar(first_of_month.year, first_of_month.month):
+        row = []
+        for day in week:
+            mood = mood_by_date.get(day)
+            row.append({
+                'date': day,
+                'in_month': day.month == first_of_month.month,
+                'is_today': day == today,
+                'mood': mood,
+                'meta': MOOD_META.get(mood, _DEFAULT_MOOD_META) if mood else None,
+            })
+        weeks.append(row)
+
+    # First-of-month math avoids a %-d/%-m style strftime call (Windows-unsafe
+    # -- see the day-label comment above); the previous/next month links are
+    # built the same plain-arithmetic way.
+    prev_month = (first_of_month - datetime.timedelta(days=1)).replace(day=1)
+    next_month = (first_of_month.replace(day=28) + datetime.timedelta(days=4)).replace(day=1)
+
+    return {
+        'calendar_weeks': weeks,
+        'calendar_weekday_labels': ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        'calendar_month_label': first_of_month,  # formatted in the template
+        'calendar_prev_month': prev_month.strftime('%Y-%m'),
+        'calendar_next_month': next_month.strftime('%Y-%m'),
+        'calendar_legend': [dict(key=key, **meta) for key, meta in MOOD_META.items()],
+    }
 
 
 # --------------------------------------------------------------------------
@@ -699,7 +842,7 @@ def caregiver_dashboard(request):
         needs_attention.append({
             'title': 'Latest reading is high',
             'detail': f'{latest_vital.bp_display} on '
-                      f'{latest_vital.recorded_at:%-d %b at %-I:%M %p}',
+                      f'{_friendly_datetime(latest_vital.recorded_at)}',
             'level': 'danger',
         })
     if can_medications and missed:

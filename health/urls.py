@@ -13,8 +13,6 @@ urlpatterns = [
     path('caregiver-dashboard/', views.caregiver_dashboard, name='health_caregiver_dashboard'),
     path('caregiver-link/', views.caregiver_link_request, name='health_caregiver_link'),
     path('caregiver-requests/', views.caregiver_requests, name='health_caregiver_requests'),
-       path('notifications/', views.notifications_view, name='notifications'),
-    path('report/', views.report_problem, name='report_problem'),
 
     path('prescription/', views.prescription_upload, name='health_prescription_upload'),
     path('prescription/<int:job_id>/verify/', views.extraction_verify, name='health_extraction_verify'),
@@ -24,4 +22,7 @@ urlpatterns = [
     path('lab-report/', views.lab_report_upload, name='health_lab_upload'),
     path('lab-report/<int:job_id>/verify/', views.lab_report_verify, name='health_lab_verify'),
     path('lab-results/', views.lab_results, name='health_lab_results'),
+
+    path('notifications/', views.notifications_view, name='notifications'),
+    path('report/', views.report_problem, name='report_problem'),
 ]
