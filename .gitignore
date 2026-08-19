@@ -27,3 +27,7 @@ Thumbs.db
 _to_delete/
 _backup_before_build.tar.gz
 _carenest_build.tar.gz
+
+# Local database dumps
+sqlite_backup.json
+*.sql.gz
