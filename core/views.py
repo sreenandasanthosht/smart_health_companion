@@ -1,11 +1,27 @@
 """
 core app views -- the "chef" that prepares pages.
-`home` gathers a little context and renders the home template.
+
+`home` is the front door at "/". It does not render a page of its own for the
+usual visitor: signed-out visitors are sent to the login page (which is also
+the public landing page), and signed-in users go straight to the dashboard for
+their role. The marketing template below is kept as a fallback for the rare
+account whose role has no dashboard mapped, so no one ever hits a dead end.
 """
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 
 
 def home(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
+
+    # Imported here rather than at module level: accounts imports several other
+    # apps, and a top-level import would tie core's load order to theirs.
+    from accounts.views import ROLE_DASHBOARD_URL
+
+    dashboard = ROLE_DASHBOARD_URL.get(request.user.role)
+    if dashboard:
+        return redirect(dashboard)
+
     context = {
         'project_name': 'CareNest',
         'tagline': 'Where Care Continues',
