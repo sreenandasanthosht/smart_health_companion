@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" fill="none" role="img" aria-labelledby="lvTitle">
+  <title id="lvTitle">Care continuing in a loop between a person, their readings, their medicines and their care team</title>
+
+  <defs>
+    <linearGradient id="lvArc" x1="120" y1="60" x2="520" y2="380" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A8CE94"/>
+      <stop offset="1" stop-color="#4E8A44"/>
+    </linearGradient>
+    <linearGradient id="lvArc2" x1="520" y1="80" x2="140" y2="360" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7FB069" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#7FB069" stop-opacity=".18"/>
+    </linearGradient>
+    <radialGradient id="lvGlow" cx="0" cy="0" r="1" gradientTransform="translate(320 210) scale(230)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7FB069" stop-opacity=".26"/>
+      <stop offset="1" stop-color="#7FB069" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <circle cx="320" cy="210" r="230" fill="url(#lvGlow)"/>
+
+  <!-- the continuous loop: care that does not stop -->
+  <circle cx="320" cy="210" r="150" stroke="url(#lvArc2)" stroke-width="1.5" stroke-dasharray="3 9" opacity=".75"/>
+  <path d="M320 42a168 168 0 1 1-118.8 49.2" stroke="url(#lvArc)" stroke-width="3" stroke-linecap="round"/>
+  <path d="M188 96l14-30 30 13" stroke="#A8CE94" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- centre: the person, held -->
+  <circle cx="320" cy="210" r="86" fill="#fff" fill-opacity=".07" stroke="#fff" stroke-opacity=".16"/>
+  <circle cx="320" cy="210" r="62" fill="#fff" fill-opacity=".05"/>
+  <path d="M320 246c-11.5-7.6-38-25.6-38-46.2 0-11.9 8.6-20.8 19.4-20.8 6.6 0 12 3.6 18.6 11.4 6.6-7.8 12-11.4 18.6-11.4 10.8 0 19.4 8.9 19.4 20.8 0 20.6-26.5 38.6-38 46.2z"
+        fill="#7FB069" fill-opacity=".2" stroke="#C9E3B8" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M281 205h17l7.5-13.5 12 25.5 7.5-12h18" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- the four points of care around the loop -->
+  <g stroke="#C9E3B8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="320" cy="42"  r="27" fill="#16301F" stroke="#7FB069" stroke-width="2"/>
+    <path d="M311 42h6l3-6 5 11 3-5h7" />
+
+    <circle cx="488" cy="210" r="27" fill="#16301F" stroke="#7FB069" stroke-width="2"/>
+    <path d="M480 217l11-11a5.6 5.6 0 0 1 8 8l-11 11a5.6 5.6 0 0 1-8-8z"/>
+    <path d="M485 212l8 8"/>
+
+    <circle cx="320" cy="378" r="27" fill="#16301F" stroke="#7FB069" stroke-width="2"/>
+    <circle cx="315" cy="373" r="4.4"/>
+    <path d="M307 388c1.4-4.6 4.6-6.3 8-6.3s6.6 1.7 8 6.3"/>
+    <path d="M326 369a4.4 4.4 0 0 1 0 8"/>
+
+    <circle cx="152" cy="210" r="27" fill="#16301F" stroke="#7FB069" stroke-width="2"/>
+    <path d="M146 199h3v7a5.5 5.5 0 0 0 11 0v-7h-3"/>
+    <path d="M151 217v1.5a6.9 6.9 0 0 0 13.8 0v-2.8"/>
+    <circle cx="164" cy="212" r="2.8"/>
+  </g>
+
+  <!-- soft base line, grounding the composition -->
+  <path d="M96 402h448" stroke="#fff" stroke-opacity=".10" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

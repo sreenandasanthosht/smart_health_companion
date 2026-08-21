@@ -26,16 +26,16 @@
                 <div class="m-val"><b>{{ series.bp.latest|default:"--" }}</b><span class="unit">mmHg</span><span class="tag">{{ series.bp.status }}</span></div>
                 {% if sparkline_bp %}
                 <svg class="spark" viewBox="0 0 240 56" preserveAspectRatio="none">
-                  <polyline points="{{ sparkline_bp }}" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linejoin="round"/>
+                  <polyline points="{{ sparkline_bp }}" fill="none" stroke="#2F6B4F" stroke-width="2.5" stroke-linejoin="round"/>
                 </svg>
                 {% else %}<div class="hint">Log at least two readings to see a trend.</div>{% endif %}
               </div>
               <div class="metric">
                 <div class="m-label">Heart rate</div>
-                <div class="m-val"><b style="color:#3b82f6;">{{ series.heart_rate.latest|default:"--" }}</b><span class="unit">bpm</span><span class="tag">{{ series.heart_rate.status }}</span></div>
+                <div class="m-val"><b style="color:#2C5FA8;">{{ series.heart_rate.latest|default:"--" }}</b><span class="unit">bpm</span><span class="tag">{{ series.heart_rate.status }}</span></div>
                 {% if sparkline_hr %}
                 <svg class="spark" viewBox="0 0 240 56" preserveAspectRatio="none">
-                  <polyline points="{{ sparkline_hr }}" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linejoin="round"/>
+                  <polyline points="{{ sparkline_hr }}" fill="none" stroke="#2C5FA8" stroke-width="2.5" stroke-linejoin="round"/>
                 </svg>
                 {% else %}<div class="hint">Log at least two readings to see a trend.</div>{% endif %}
               </div>

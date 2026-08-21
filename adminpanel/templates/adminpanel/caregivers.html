@@ -39,7 +39,7 @@
               <td><span class="pill {% if r.link.status == 'APPROVED' %}ok{% elif r.link.status == 'PENDING' %}warn{% else %}muted{% endif %}">{{ r.link.get_status_display }}</span></td>
               <td>
                 <div class="s">{{ r.scopes }}</div>
-                {% if r.restricted %}<div class="s" style="color:#b45309;">Restricted: {{ r.restricted }}</div>{% endif %}
+                {% if r.restricted %}<div class="s" style="color:#8A5A00;">Restricted: {{ r.restricted }}</div>{% endif %}
               </td>
               <td>
                 {% if r.link.status == 'APPROVED' %}

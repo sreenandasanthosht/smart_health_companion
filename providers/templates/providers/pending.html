@@ -29,7 +29,7 @@
       <div class="grid g-7-5">
         <div class="panel"><div class="p-body tall" style="text-align:center;padding:34px 24px;">
           <div style="width:76px;height:76px;border-radius:22px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;
-            {% if profile.is_verified %}background:#dcfce7;color:#16a34a;{% elif profile.verification_status == 'NEEDS_INFO' %}background:#fee2e2;color:#dc2626;{% else %}background:#fef3e2;color:#d97706;{% endif %}">
+            {% if profile.is_verified %}background:#E4F0E7;color:#2F6B4F;{% elif profile.verification_status == 'NEEDS_INFO' %}background:#FBEDEC;color:#A4302A;{% else %}background:#FBF3E3;color:#8A5A00;{% endif %}">
             <svg class="ic" style="width:34px;height:34px;"><use href="#{% if profile.is_verified %}i-check{% else %}i-clock{% endif %}"/></svg>
           </div>
           <div style="font-size:18px;font-weight:800;margin-bottom:6px;">{{ profile.get_verification_status_display }}</div>

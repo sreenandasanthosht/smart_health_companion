@@ -7,8 +7,8 @@
     <title>{% block title %}Dashboard &middot; CareNest{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link href="{% static 'css/dashboard.css' %}" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap" rel="stylesheet">
+    <link href="{% static 'css/carenest.css' %}" rel="stylesheet">
 </head>
 <body>
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
@@ -44,6 +44,11 @@
   <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M4 20c0-9 7-15 16-15 0 9-6 16-15 16-.7 0-1 0-1-1z"/><path d="M4 20c4-6 8-8 12-9"/></symbol>
   <symbol id="i-heart-pulse" viewBox="0 0 24 24"><path d="M12 20s-6.5-4.3-9-8.5C1.3 8.3 3 4.5 6.7 4.5c2 0 3.4 1.2 5.3 3.3 1.9-2.1 3.3-3.3 5.3-3.3 3.7 0 5.4 3.8 3.7 7C18.5 15.7 12 20 12 20z"/><path d="M3.2 11.5H7l1.4-2.4 2.3 4.6 1.4-2.2h3.4"/></symbol>
   <symbol id="i-log-out" viewBox="0 0 24 24"><path d="M14 4h5v16h-5"/><path d="M3 12h12M11 8l4 4-4 4"/></symbol>
+  <symbol id="i-alert-triangle" viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4"/><path d="M12 17v.5"/></symbol>
+  <symbol id="i-alert-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v4.5"/><path d="M12 16v.5"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5"/><path d="M12 8v.5"/></symbol>
+  <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M4 13h4l1.5 3h5L16 13h4"/><path d="M5.5 5h13l1.5 8v6H4v-6z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
 </svg>
 
 <div class="app">
@@ -52,10 +57,10 @@
 
   <div class="main">
     <header class="topbar">
-      <span class="hamburger"><svg class="ic"><use href="#i-menu"/></svg></span>
-      <div class="search"><svg class="ic"><use href="#i-search"/></svg><input placeholder="Search anything..."></div>
+      <button class="hamburger" type="button" aria-label="Open menu"><svg class="ic" aria-hidden="true"><use href="#i-menu"/></svg></button>
+      <div class="search"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg><label class="sr-only" for="global-search">Search</label><input id="global-search" type="search" placeholder="Search medicines, reports or appointments"></div>
       <div class="spacer"></div>
-      <a class="icon-btn" href="{% if user.is_authenticated %}{% url 'notifications' %}{% else %}#{% endif %}"><svg class="ic"><use href="#i-bell"/></svg></a>
+      <a class="icon-btn" href="{% if user.is_authenticated %}{% url 'notifications' %}{% else %}#{% endif %}"><svg class="ic" aria-hidden="true"><use href="#i-bell"/></svg><span class="sr-only">Notifications</span></a>
       <div class="profile">
         <span class="avatar">{% if user.is_authenticated %}{{ user.initials }}{% else %}CN{% endif %}</span>
         <div>
@@ -66,7 +71,8 @@
       </div>
     </header>
 
-    <div class="content">
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <div class="content" id="main-content">
 {% if platform_notice %}
       <div class="callout warn">
         <svg class="ic"><use href="#i-bell"/></svg><div class="c-body">{{ platform_notice }}</div>
