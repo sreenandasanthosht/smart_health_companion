@@ -102,6 +102,23 @@ if os.getenv('USE_SQLITE', '0') == '1':
         }
     }
 else:
+    # Connection options. utf8mb4 is the full Unicode charset (emoji, Malayalam,
+    # anything a patient might type). connect_timeout stops the app hanging for
+    # a minute when the database is unreachable -- it fails fast instead.
+    DB_OPTIONS = {'charset': 'utf8mb4', 'connect_timeout': 10}
+
+    # A hosted database (Aiven, PlanetScale, RDS...) refuses plain-text
+    # connections, so we hand the driver the provider's CA certificate. Set
+    # DB_SSL_CA in .env to the certificate's filename; a bare filename is
+    # looked up next to manage.py. Leave it empty for a local MySQL, which
+    # needs no certificate.
+    _ssl_ca = os.getenv('DB_SSL_CA', '').strip()
+    if _ssl_ca:
+        _ssl_path = Path(_ssl_ca)
+        if not _ssl_path.is_absolute():
+            _ssl_path = BASE_DIR / _ssl_ca
+        DB_OPTIONS['ssl'] = {'ca': str(_ssl_path)}
+
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql',
@@ -110,7 +127,13 @@ else:
             'PASSWORD': os.getenv('DB_PASSWORD', ''),
             'HOST': os.getenv('DB_HOST', '127.0.0.1'),
             'PORT': os.getenv('DB_PORT', '3306'),
-            'OPTIONS': {'charset': 'utf8mb4'},
+            'OPTIONS': DB_OPTIONS,
+            # Reuse each database connection for a minute instead of opening a
+            # fresh one per request. Negligible locally; a real speed-up when
+            # the database is in a data centre and every handshake costs a
+            # round trip over the internet.
+            'CONN_MAX_AGE': int(os.getenv('DB_CONN_MAX_AGE', '60')),
+            'CONN_HEALTH_CHECKS': True,
         }
     }
 

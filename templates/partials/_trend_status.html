@@ -1,0 +1,12 @@
+{% comment %}
+Renders a vitals status as icon + word + colour -- never colour alone.
+Include it with the series dict as "s", for example series.bp or series.heart_rate.
+Note: Django {# #} comments are SINGLE-LINE only. A multi-line one is not
+recognised as a comment at all -- its contents render as literal text, and any
+tag inside it is executed. Use {% templatetag openblock %} comment blocks instead.
+{% endcomment %}
+{% if s.status == 'Normal' %}<span class="status status--normal"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Normal</span>
+{% elif s.status == 'Elevated' %}<span class="status status--attention"><svg class="ic" aria-hidden="true"><use href="#i-alert-circle"/></svg>A little high</span>
+{% elif s.status == 'High' %}<span class="status status--warning"><svg class="ic" aria-hidden="true"><use href="#i-alert-triangle"/></svg>High</span>
+{% elif s.status == 'No data' %}<span class="status status--completed"><svg class="ic" aria-hidden="true"><use href="#i-inbox"/></svg>Nothing logged</span>
+{% endif %}

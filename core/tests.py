@@ -537,8 +537,18 @@ class EveryPageRendersTests(TestCase):
     """Open every page as the role that owns it and assert a clean 200."""
 
     def test_public_pages(self):
-        for name in ('home', 'login', 'register'):
+        for name in ('login', 'register'):
             self.assertEqual(self.client.get(reverse(name)).status_code, 200)
+
+    def test_home_sends_anonymous_visitors_to_login(self):
+        """The front door at '/' hands signed-out visitors the login page."""
+        response = self.client.get(reverse('home'))
+        self.assertRedirects(response, reverse('login'))
+
+    def test_home_sends_signed_in_users_to_their_dashboard(self):
+        self.client.force_login(make('ephome@example.com', User.Role.PATIENT))
+        response = self.client.get(reverse('home'))
+        self.assertRedirects(response, reverse('health_dashboard'))
 
     def test_patient_pages(self):
         self.client.force_login(make('epp@example.com', User.Role.PATIENT))

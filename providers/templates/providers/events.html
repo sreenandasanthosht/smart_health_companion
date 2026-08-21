@@ -34,7 +34,7 @@
               <div class="t">{{ e.title }}
                 <span class="pill {% if e.status == 'APPROVED' %}ok{% elif e.status == 'REJECTED' %}muted{% else %}warn{% endif %}">{{ e.get_status_display }}</span></div>
               <div class="s">{{ e.get_kind_display }} &middot; {{ e.starts_at|date:"j M Y, g:i A" }}{% if e.venue %} &middot; {{ e.venue }}{% endif %}</div>
-              {% if e.review_note %}<div class="s" style="color:#b45309;">{{ e.review_note }}</div>{% endif %}
+              {% if e.review_note %}<div class="s" style="color:#8A5A00;">{{ e.review_note }}</div>{% endif %}
             </div>
             {% if e.status == 'PENDING' %}
             <form method="post">

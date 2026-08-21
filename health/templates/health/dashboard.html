@@ -1,277 +1,535 @@
 {% extends 'base_dashboard.html' %}
-{% block title %}Patient Dashboard &middot; CareNest{% endblock %}
+{% block title %}Your dashboard &middot; {{ project_name|default:"CareNest" }}{% endblock %}
 {% block sidebar %}{% include 'partials/_sidebar.html' with active='dashboard' %}{% endblock %}
 
 {% block dashboard_content %}
 
       {% for message in messages %}
       <div class="callout {% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warn{% else %}info{% endif %}">
-        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+        <svg class="ic"><use href="#{% if message.tags == 'error' %}i-alert-triangle{% elif message.tags == 'warning' %}i-alert-circle{% else %}i-check{% endif %}"/></svg>
+        <div class="c-body">{{ message }}</div>
       </div>
       {% endfor %}
 
-      <div class="greet-row">
-        <div class="greet">
-          <h1>Hello, {{ patient.first_name|default:patient.display_name }}!</h1>
-          <div class="sub">Your patient ID is <strong>{{ patient.unique_id }}</strong> &mdash; share it with a caregiver to link them.</div>
-          <div class="date"><svg class="ic"><use href="#i-calendar"/></svg> {{ today|date:"j F Y, l" }}</div>
+
+      {% comment %}GREETING{% endcomment %}
+      <div class="hello">
+        <h1>Hello, {{ patient.first_name|default:patient.display_name }}</h1>
+        <p class="h-sub">
+          {% if med_summary.missed %}You have {{ med_summary.missed|length }} medicine{{ med_summary.missed|length|pluralize }} to catch up on.
+          {% elif med_summary.due %}It's time for {{ med_summary.due|length }} of your medicines.
+          {% elif doses_due %}You have {{ doses_due }} medicine{{ doses_due|pluralize }} still to take today.
+          {% else %}Everything is on track today.{% endif %}
+        </p>
+        <div class="h-meta">
+          <span class="m"><svg class="ic"><use href="#i-calendar"/></svg>{{ today|date:"l, j F Y" }}</span>
+          <span class="m"><svg class="ic"><use href="#i-users"/></svg>Your ID <code>{{ patient.unique_id }}</code> &mdash; give this to a caregiver to link them</span>
         </div>
-        <div class="ai-card">
-          <div class="ai-body">
-            <div class="ai-title"><svg class="ic"><use href="#i-sparkles"/></svg> Health Summary</div>
-            <div class="ai-list">
-              {% for insight in insights|slice:":4" %}
-              <div class="li">
-                <span class="ck {% if insight.level == 'CRITICAL' %}crit{% elif insight.level == 'WARNING' %}warn{% endif %}">
-                  <svg class="ic"><use href="#{% if insight.level == 'INFO' %}i-check{% else %}i-shield-alert{% endif %}"/></svg>
-                </span> {{ insight.text }}
+      </div>
+
+
+      {% comment %}ZONE 1 — NEEDS YOU NOW
+Only genuinely actionable items. Each one carries its own button.{% endcomment %}
+      <section class="zone">
+        <div class="zone-title">
+          <h2>Needs you now</h2>
+          <span class="z-sub">Things you can act on today</span>
+        </div>
+
+        <div class="attn-stack">
+
+          {% if med_summary.missed %}
+          <div class="attn">
+            <span class="a-ic"><svg class="ic"><use href="#i-pill"/></svg></span>
+            <div class="a-body">
+              <div class="a-t">{{ med_summary.missed|length }} medicine{{ med_summary.missed|length|pluralize }} not marked as taken</div>
+              <div class="a-s">
+                {% for d in med_summary.missed|slice:":3" %}{{ d.medication.name }}{% if not forloop.last %}, {% endif %}{% endfor %}{% if med_summary.missed|length > 3 %} and {{ med_summary.missed|length|add:"-3" }} more{% endif %}.
+                If you took them, mark them off so your record stays accurate.
+              </div>
+            </div>
+            <div class="a-act">
+              <a class="btn btn-primary" href="{% url 'health_medications' %}"><svg class="ic"><use href="#i-check"/></svg>Update my medicines</a>
+            </div>
+          </div>
+          {% endif %}
+
+          {% for d in med_summary.due|slice:":2" %}
+          <div class="attn attn--info">
+            <span class="a-ic"><svg class="ic"><use href="#i-clock"/></svg></span>
+            <div class="a-body">
+              <div class="a-t">Time to take {{ d.medication.name }} {{ d.medication.dose }}</div>
+              <div class="a-s">{{ d.dose_time.get_slot_display }}, due at {{ d.dose_time.at_time|time:"g:i A" }}.</div>
+            </div>
+            <div class="a-act">
+              <form method="post" action="{% url 'health_medications' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="toggle_dose">
+                <input type="hidden" name="dose_id" value="{{ d.id }}">
+                <button type="submit" class="btn btn-primary"><svg class="ic"><use href="#i-check"/></svg>Mark as taken</button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+
+          {% for i in insights %}{% if i.level == 'CRITICAL' %}
+          <div class="attn attn--critical">
+            <span class="a-ic"><svg class="ic"><use href="#i-alert-triangle"/></svg></span>
+            <div class="a-body">
+              <div class="a-t">{{ i.text }}</div>
+              <div class="a-s">{{ i.evidence }}</div>
+            </div>
+            <div class="a-act">
+              <a class="btn btn-secondary" href="{% url 'health_vitals' %}">See my readings</a>
+            </div>
+          </div>
+          {% endif %}{% endfor %}
+
+          {% if pending_caregivers %}
+          <div class="attn attn--info">
+            <span class="a-ic"><svg class="ic"><use href="#i-users"/></svg></span>
+            <div class="a-body">
+              <div class="a-t">{{ pending_caregivers|length }} caregiver request{{ pending_caregivers|length|pluralize }} waiting for you</div>
+              <div class="a-s">They can see your health information only after you say yes.</div>
+            </div>
+            <div class="a-act">
+              <a class="btn btn-primary" href="{% url 'health_caregiver_requests' %}">Review request{{ pending_caregivers|length|pluralize }}</a>
+            </div>
+          </div>
+          {% endif %}
+
+          {% for m in med_summary.low_stock|slice:":2" %}
+          <div class="attn">
+            <span class="a-ic"><svg class="ic"><use href="#i-alert-circle"/></svg></span>
+            <div class="a-body">
+              <div class="a-t">{{ m.name }} is running low</div>
+              <div class="a-s">Order more so you don't run out.</div>
+            </div>
+            <div class="a-act">
+              <a class="btn btn-secondary" href="{% url 'health_medications' %}">Manage supply</a>
+            </div>
+          </div>
+          {% endfor %}
+
+          {% if not med_summary.missed and not med_summary.due and not pending_caregivers and not med_summary.low_stock %}
+          <div class="allclear">
+            <span class="a-ic"><svg class="ic"><use href="#i-check"/></svg></span>
+            <div>
+              <div class="a-t">Nothing needs your attention right now</div>
+              <div class="a-s">You're up to date on your medicines and there are no new requests.</div>
+            </div>
+          </div>
+          {% endif %}
+
+        </div>
+
+        {% if show_profile_prompt %}
+        <div class="slim">
+          <svg class="ic"><use href="#i-user"/></svg>
+          <span class="s-bar"><span style="width:{{ profile_completion }}%"></span></span>
+          <span class="s-txt"><b>Profile {{ profile_completion }}% complete.</b> Adding the rest helps your doctor give better advice.</span>
+          <a href="{% url 'profile' %}">Finish profile &rarr;</a>
+        </div>
+        {% endif %}
+      </section>
+
+
+      {% comment %}ZONE 2 — TODAY{% endcomment %}
+      <section class="zone">
+        <div class="zone-title">
+          <h2>Today</h2>
+          <span class="z-sub">{{ today|date:"l, j F" }}</span>
+        </div>
+
+        <div class="today-grid">
+
+          {# ---- Left: medicines ---- #}
+          <div class="panel">
+            <div class="p-title">
+              <svg class="ic"><use href="#i-pill"/></svg>Your medicines today
+              <a class="more" href="{% url 'health_medications' %}">Manage all<svg class="ic"><use href="#i-chevron-right"/></svg></a>
+            </div>
+            <div class="p-body">
+              {% for d in todays_doses %}
+              <div class="dose {% if d.taken %}is-taken{% elif d.is_missed %}is-missed{% elif d.is_due %}is-due{% else %}is-later{% endif %}">
+                <span class="d-ic"><svg class="ic"><use href="#i-pill"/></svg></span>
+                <div class="d-body">
+                  <div class="d-name">{{ d.medication.name }} {{ d.medication.dose }}</div>
+                  <div class="d-when">
+                    {{ d.dose_time.get_slot_display }} at {{ d.dose_time.at_time|time:"g:i A" }}
+                    &middot; {{ d.dose_time.quantity|floatformat:"-2" }} to take
+                  </div>
+                </div>
+                <div class="d-act">
+                  {% if d.taken %}
+                    <span class="status status--completed"><svg class="ic"><use href="#i-check"/></svg>Taken</span>
+                  {% elif d.is_missed %}
+                    <span class="status status--attention"><svg class="ic"><use href="#i-alert-circle"/></svg>Not marked</span>
+                    <form method="post" action="{% url 'health_medications' %}">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="toggle_dose">
+                      <input type="hidden" name="dose_id" value="{{ d.id }}">
+                      <button type="submit" class="btn btn-secondary btn-sm">I took this</button>
+                    </form>
+                  {% elif d.is_due %}
+                    <form method="post" action="{% url 'health_medications' %}">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="toggle_dose">
+                      <input type="hidden" name="dose_id" value="{{ d.id }}">
+                      <button type="submit" class="btn btn-primary btn-sm"><svg class="ic"><use href="#i-check"/></svg>Mark as taken</button>
+                    </form>
+                  {% else %}
+                    <span class="status status--upcoming"><svg class="ic"><use href="#i-clock"/></svg>Later today</span>
+                  {% endif %}
+                </div>
+              </div>
+              {% empty %}
+              <div class="empty">
+                <div class="e-ic"><svg class="ic"><use href="#i-pill"/></svg></div>
+                <h4>No medicines set up yet</h4>
+                <p>Add your medicines and we'll remind you when each one is due.</p>
+                <a class="btn btn-primary" href="{% url 'health_medications' %}">Add a medicine</a>
               </div>
               {% endfor %}
             </div>
           </div>
-          <svg class="shield" viewBox="0 0 150 150" fill="none">
-            <path d="M75 18l40 16v30c0 30-20 52-40 60-20-8-40-30-40-60V34z" fill="url(#sg)"/>
-            <path d="M75 18l40 16v30c0 30-20 52-40 60V18z" fill="#059669" opacity=".25"/>
-            <path d="M58 74l12 12 24-26" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-            <defs><linearGradient id="sg" x1="35" y1="18" x2="115" y2="124" gradientUnits="userSpaceOnUse">
-              <stop stop-color="#34d399"/><stop offset="1" stop-color="#059669"/></linearGradient></defs>
-          </svg>
-        </div>
-      </div>
 
-      {% if show_profile_prompt %}
-      <div class="callout warn">
-        <svg class="ic"><use href="#i-user"/></svg>
-        <div class="c-body">
-          <strong>Your profile is {{ profile_completion }}% complete.</strong>
-          Still needed: {{ missing_fields|join:", " }}.
-          <a href="{% url 'profile' %}" style="font-weight:700;">Complete it now &rarr;</a>
-        </div>
-      </div>
-      {% endif %}
+          {# ---- Right: goals + what's next ---- #}
+          <div class="grid" style="gap:var(--sp-5)">
 
-      {% if pending_caregivers %}
-      <div class="callout info">
-        <svg class="ic"><use href="#i-users"/></svg>
-        <div class="c-body">
-          <strong>{{ pending_caregivers|length }} caregiver request{{ pending_caregivers|length|pluralize }}</strong> waiting for your approval.
-          <a href="{% url 'health_caregiver_requests' %}" style="font-weight:700;">Review &rarr;</a>
-        </div>
-      </div>
-      {% endif %}
-
-      <div class="grid stats">
-        <div class="card stat">
-          <div class="top"><span class="chip green"><svg class="ic"><use href="#i-pill"/></svg></span></div>
-          <div class="label">Medicines Due</div>
-          <div class="big">{{ doses_due }}</div>
-          <div class="meta">{% if adherence is not None %}{{ adherence }}% taken over 14 days{% else %}No doses tracked yet{% endif %}</div>
-          <a class="link" href="{% url 'health_medications' %}">View medicines <svg class="ic"><use href="#i-arrow-right"/></svg></a>
-        </div>
-
-        <div class="card stat appt">
-          <div class="top"><span class="chip blue"><svg class="ic"><use href="#i-calendar-days"/></svg></span><div class="label">Next Appointment</div></div>
-          {% if next_appointment %}
-          <div class="big">{{ next_appointment.scheduled_for|date:"j M" }}</div>
-          <div class="meta">{{ next_appointment.scheduled_for|date:"g:i A" }}</div>
-          <div class="meta">{{ next_appointment.provider.display_name }}</div>
-          {% if next_appointment.status == 'CONFIRMED' %}
-          <form method="post" action="{% url 'provider_previsit_share' %}" style="margin-top:8px;">
-            {% csrf_token %}
-            <input type="hidden" name="appointment_id" value="{{ next_appointment.id }}">
-            <input type="hidden" name="next" value="{% url 'health_dashboard' %}">
-            <button type="submit" class="btn btn-ghost" style="padding:6px 10px;font-size:12px;">Share pre-visit snapshot</button>
-          </form>
-          {% endif %}
-          {% else %}
-          <div class="big">None</div>
-          <div class="meta">Nothing booked yet</div>
-          {% endif %}
-          <a class="link" href="{% url 'provider_appointments' %}">Manage <svg class="ic"><use href="#i-arrow-right"/></svg></a>
-        </div>
-
-        <div class="card stat reminder">
-          <div class="top"><span class="chip orange"><svg class="ic"><use href="#i-bell"/></svg></span><div class="label">Next Refill</div></div>
-          {% if upcoming_refill %}
-          <div class="big">{{ upcoming_refill.name }}</div>
-          <div class="meta">Due {{ upcoming_refill.next_refill_date|date:"j M Y" }}</div>
-          {% else %}
-          <div class="big">None set</div>
-          <div class="meta">Add a refill date to a medicine</div>
-          {% endif %}
-          <a class="link" href="{% url 'health_medications' %}">View details <svg class="ic"><use href="#i-arrow-right"/></svg></a>
-        </div>
-
-        <div class="card stat">
-          <div class="top"><span class="chip purple"><svg class="ic"><use href="#i-heart-pulse"/></svg></span><div class="label">Health Score</div></div>
-          <div class="score-wrap">
-            <div>
-              <div class="big">{{ health_score }} <small>/100</small></div>
-              <div class="meta" style="color:#16a34a;font-weight:700;">{{ health_band }}</div>
+            <div class="panel">
+              <div class="p-title">
+                <svg class="ic"><use href="#i-target"/></svg>Today's goals
+                <a class="more" href="{% url 'health_lifestyle' %}">Log<svg class="ic"><use href="#i-chevron-right"/></svg></a>
+              </div>
+              <div class="p-body">
+                {% for g in goals %}
+                <div class="goal g{{ forloop.counter }}">
+                  <div class="g-top">
+                    <svg class="ic"><use href="#{{ g.icon }}"/></svg>
+                    <span class="g-name">{{ g.name }}</span>
+                    <span class="g-val">{{ g.value }}</span>
+                  </div>
+                  <div class="bar"><span style="width:{{ g.pct }}%"></span></div>
+                </div>
+                {% endfor %}
+              </div>
             </div>
-            <div class="score-ring">
-              <svg viewBox="0 0 74 74"><circle cx="37" cy="37" r="31" fill="none" stroke="#eef1f6" stroke-width="8"/>
-                <circle cx="37" cy="37" r="31" fill="none" stroke="url(#pg)" stroke-width="8" stroke-linecap="round"
-                  stroke-dasharray="195" stroke-dashoffset="{{ score_offset }}" transform="rotate(-90 37 37)"/>
-                <defs><linearGradient id="pg" x1="0" y1="0" x2="74" y2="74"><stop stop-color="#a78bfa"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs></svg>
+
+            <div class="panel">
+              <div class="p-title"><svg class="ic"><use href="#i-calendar-days"/></svg>What's coming up</div>
+              <div class="p-body">
+                <div class="upnext">
+                  <div class="u">
+                    <span class="u-ic"><svg class="ic"><use href="#i-stethoscope"/></svg></span>
+                    <div>
+                      <div class="u-lab">Next appointment</div>
+                      {% if next_appointment %}
+                      <div class="u-val">{{ next_appointment.scheduled_for|date:"l j F, g:i A" }}</div>
+                      <div class="u-sub">With {{ next_appointment.provider.display_name }}</div>
+                      {% if next_appointment.status == 'CONFIRMED' %}
+                      <form method="post" action="{% url 'provider_previsit_share' %}" style="margin-top:10px">
+                        {% csrf_token %}
+                        <input type="hidden" name="appointment_id" value="{{ next_appointment.id }}">
+                        <input type="hidden" name="next" value="{% url 'health_dashboard' %}">
+                        <button type="submit" class="btn btn-secondary btn-sm">Send my recent readings ahead</button>
+                      </form>
+                      {% endif %}
+                      {% else %}
+                      <div class="u-val" style="color:var(--muted)">Nothing booked</div>
+                      <div class="u-sub"><a href="{% url 'provider_appointments' %}">Book an appointment &rarr;</a></div>
+                      {% endif %}
+                    </div>
+                  </div>
+
+                  <div class="u">
+                    <span class="u-ic"><svg class="ic"><use href="#i-bell"/></svg></span>
+                    <div>
+                      <div class="u-lab">Next medicine to reorder</div>
+                      {% if upcoming_refill %}
+                      <div class="u-val">{{ upcoming_refill.name }}</div>
+                      <div class="u-sub">Order by {{ upcoming_refill.next_refill_date|date:"j F Y" }}</div>
+                      {% else %}
+                      <div class="u-val" style="color:var(--muted)">None due</div>
+                      <div class="u-sub">Add a reorder date on the medicines page.</div>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-          <a class="link" href="{% url 'health_vitals' %}" style="margin-top:10px;">See vitals <svg class="ic"><use href="#i-arrow-right"/></svg></a>
-        </div>
-      </div>
 
-      <div class="section panel">
-        <div class="panel-head">
-          <div class="h"><svg class="ic"><use href="#i-activity"/></svg> Health Analytics</div>
-          <a class="right" href="{% url 'health_vitals' %}">Log a reading <svg class="ic"><use href="#i-arrow-right"/></svg></a>
-        </div>
-        <div class="grid analytics-grid">
-          <div class="metric">
-            <div class="m-label">Blood Pressure</div>
-            <div class="m-val"><b>{{ series.bp.latest|default:"--" }}</b><span class="unit">mmHg</span><span class="tag">{{ series.bp.status }}</span></div>
-            {% if sparklines.bp %}
-            <svg class="spark" viewBox="0 0 240 56" preserveAspectRatio="none">
-              <polyline points="{{ sparklines.bp }}" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linejoin="round"/>
-            </svg>
-            {% else %}<div class="hint">Log at least two readings to see a trend.</div>{% endif %}
-            <div class="axis">{% for l in series.bp.labels %}<span>{{ l }}</span>{% endfor %}</div>
-          </div>
-
-          <div class="metric">
-            <div class="m-label">Heart Rate</div>
-            <div class="m-val"><b style="color:#3b82f6;">{{ series.heart_rate.latest|default:"--" }}</b><span class="unit">bpm</span><span class="tag">{{ series.heart_rate.status }}</span></div>
-            {% if sparklines.heart_rate %}
-            <svg class="spark" viewBox="0 0 240 56" preserveAspectRatio="none">
-              <polyline points="{{ sparklines.heart_rate }}" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linejoin="round"/>
-            </svg>
-            {% else %}<div class="hint">Log at least two readings to see a trend.</div>{% endif %}
-            <div class="axis">{% for l in series.heart_rate.labels %}<span>{{ l }}</span>{% endfor %}</div>
-          </div>
-
-          <div class="metric">
-            <div class="m-label">Blood Sugar</div>
-            <div class="m-val"><b style="color:#8b5cf6;">{{ series.blood_sugar.latest|default:"--" }}</b><span class="unit">mg/dL</span><span class="tag" style="color:#8b5cf6;">{{ series.blood_sugar.status }}</span></div>
-            {% if sparklines.blood_sugar %}
-            <svg class="spark" viewBox="0 0 240 56" preserveAspectRatio="none">
-              <polyline points="{{ sparklines.blood_sugar }}" fill="none" stroke="#8b5cf6" stroke-width="2.5" stroke-linejoin="round"/>
-            </svg>
-            {% else %}<div class="hint">Log at least two readings to see a trend.</div>{% endif %}
-            <div class="axis">{% for l in series.blood_sugar.labels %}<span>{{ l }}</span>{% endfor %}</div>
-          </div>
-
-          <div class="metric">
-            <div class="m-label">Weight</div>
-            <div class="m-val"><b style="color:#14b8a6;">{{ series.weight.latest|default:"--" }}</b><span class="unit">kg</span></div>
-            {% if sparklines.weight %}
-            <svg class="spark" viewBox="0 0 240 56" preserveAspectRatio="none">
-              <polyline points="{{ sparklines.weight }}" fill="none" stroke="#14b8a6" stroke-width="2.5" stroke-linejoin="round"/>
-            </svg>
-            {% else %}<div class="hint">Log at least two readings to see a trend.</div>{% endif %}
-            <div class="axis">{% for l in series.weight.labels %}<span>{{ l }}</span>{% endfor %}</div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div class="grid cols3">
+
+      {% comment %}ZONE 2b — YOUR CARE TEAM (continuity of care){% endcomment %}
+      <section class="zone">
+        <div class="zone-title">
+          <h2>Your care, connected</h2>
+          <span class="z-sub">Everyone who helps you look after your health</span>
+          <a class="z-link" href="{% url 'health_share' %}">Manage who can see what <svg class="ic"><use href="#i-chevron-right"/></svg></a>
+        </div>
+
+        <div class="care-strip">
+          <div class="care-node {% if not next_appointment %}is-empty{% endif %}">
+            <span class="c-ic"><svg class="ic"><use href="#i-stethoscope"/></svg></span>
+            <span class="c-lab">Your doctor</span>
+            <span class="c-val">{% if next_appointment %}{{ next_appointment.provider.display_name }}{% else %}Not booked{% endif %}</span>
+            <span class="c-sub">{% if next_appointment %}Seeing you {{ next_appointment.scheduled_for|date:"j M" }}{% else %}Find a provider when you need one{% endif %}</span>
+          </div>
+
+          <div class="care-node {% if not care_plans %}is-empty{% endif %}">
+            <span class="c-ic"><svg class="ic"><use href="#i-target"/></svg></span>
+            <span class="c-lab">Care plan</span>
+            <span class="c-val">{% if care_plans %}{{ care_plans|length }} target{{ care_plans|length|pluralize }} set{% else %}None yet{% endif %}</span>
+            <span class="c-sub">{% if care_plans %}Agreed with your provider{% else %}Your provider can set goals for you{% endif %}</span>
+          </div>
+
+          <div class="care-node {% if not pending_caregivers %}is-empty{% endif %}">
+            <span class="c-ic"><svg class="ic"><use href="#i-users"/></svg></span>
+            <span class="c-lab">Caregivers</span>
+            <span class="c-val">{% if pending_caregivers %}{{ pending_caregivers|length }} waiting{% else %}None pending{% endif %}</span>
+            <span class="c-sub">Family or friends you allow to help</span>
+          </div>
+
+          <div class="care-node {% if not upcoming_refill %}is-empty{% endif %}">
+            <span class="c-ic"><svg class="ic"><use href="#i-pill"/></svg></span>
+            <span class="c-lab">Pharmacy</span>
+            <span class="c-val">{% if upcoming_refill %}Reorder due{% else %}Nothing due{% endif %}</span>
+            <span class="c-sub">{% if upcoming_refill %}{{ upcoming_refill.name }} by {{ upcoming_refill.next_refill_date|date:"j M" }}{% else %}Your supplies are stocked{% endif %}</span>
+          </div>
+        </div>
+      </section>
+
+
+      {% comment %}ZONE 3 — TRENDS{% endcomment %}
+      <section class="zone">
+        <div class="zone-title">
+          <h2>Your trends</h2>
+          <span class="z-sub">How your readings have moved recently</span>
+          <a class="z-link" href="{% url 'health_vitals' %}">Log a new reading <svg class="ic"><use href="#i-chevron-right"/></svg></a>
+        </div>
+
         <div class="panel">
-          <div class="p-title"><svg class="ic"><use href="#i-activity"/></svg> Recent Activity</div>
-          <div class="p-body">
-            {% for a in activity %}
-            <div class="act"><span class="ai {{ a.tint }}"><svg class="ic"><use href="#{{ a.icon }}"/></svg></span>
-              <div><div class="t">{{ a.title }}</div><div class="s">{{ a.when|date:"j M Y, g:i A" }}</div></div></div>
-            {% empty %}
-            <p style="color:var(--muted);font-size:13.5px;">Nothing logged yet. Start by adding a vitals reading.</p>
-            {% endfor %}
+          <div class="trend-grid">
+
+            <div class="trend">
+              <div class="t-head">
+                <span class="t-name">Blood pressure</span>
+                <span class="t-state">
+                  {% include 'partials/_trend_status.html' with s=series.bp %}
+                </span>
+              </div>
+              <div class="t-val"><b>{{ series.bp.latest|default:"--" }}</b><span class="unit">mmHg</span></div>
+              {% if sparklines.bp %}
+              <svg class="spark" viewBox="0 0 240 56" preserveAspectRatio="none" role="img" aria-label="Blood pressure trend">
+                <polyline points="{{ sparklines.bp }}" fill="none" stroke="#2F6B4F" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+              </svg>
+              <div class="axis">{% for l in series.bp.labels %}<span>{{ l }}</span>{% endfor %}</div>
+              {% else %}<p class="hint">Log at least two readings to see a trend line here.</p>{% endif %}
+            </div>
+
+            <div class="trend">
+              <div class="t-head">
+                <span class="t-name">Heart rate</span>
+                <span class="t-state">
+                  {% include 'partials/_trend_status.html' with s=series.heart_rate %}
+                </span>
+              </div>
+              <div class="t-val"><b>{{ series.heart_rate.latest|default:"--" }}</b><span class="unit">beats per minute</span></div>
+              {% if sparklines.heart_rate %}
+              <svg class="spark" viewBox="0 0 240 56" preserveAspectRatio="none" role="img" aria-label="Heart rate trend">
+                <polyline points="{{ sparklines.heart_rate }}" fill="none" stroke="#2C5FA8" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+              </svg>
+              <div class="axis">{% for l in series.heart_rate.labels %}<span>{{ l }}</span>{% endfor %}</div>
+              {% else %}<p class="hint">Log at least two readings to see a trend line here.</p>{% endif %}
+            </div>
+
+            <div class="trend">
+              <div class="t-head">
+                <span class="t-name">Blood sugar</span>
+                <span class="t-state">
+                  {% include 'partials/_trend_status.html' with s=series.blood_sugar %}
+                </span>
+              </div>
+              <div class="t-val"><b>{{ series.blood_sugar.latest|default:"--" }}</b><span class="unit">mg/dL</span></div>
+              {% if sparklines.blood_sugar %}
+              <svg class="spark" viewBox="0 0 240 56" preserveAspectRatio="none" role="img" aria-label="Blood sugar trend">
+                <polyline points="{{ sparklines.blood_sugar }}" fill="none" stroke="#5B4B8A" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+              </svg>
+              <div class="axis">{% for l in series.blood_sugar.labels %}<span>{{ l }}</span>{% endfor %}</div>
+              {% else %}<p class="hint">Log at least two readings to see a trend line here.</p>{% endif %}
+            </div>
+
+            <div class="trend">
+              <div class="t-head">
+                <span class="t-name">Weight</span>
+              </div>
+              <div class="t-val"><b>{{ series.weight.latest|default:"--" }}</b><span class="unit">kg</span></div>
+              {% if sparklines.weight %}
+              <svg class="spark" viewBox="0 0 240 56" preserveAspectRatio="none" role="img" aria-label="Weight trend">
+                <polyline points="{{ sparklines.weight }}" fill="none" stroke="#8A5A00" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+              </svg>
+              <div class="axis">{% for l in series.weight.labels %}<span>{{ l }}</span>{% endfor %}</div>
+              {% else %}<p class="hint">Log at least two readings to see a trend line here.</p>{% endif %}
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+
+      {% comment %}ZONE 4 — BACKGROUND: score, activity, care plans, suggestions{% endcomment %}
+      <section class="zone">
+        <div class="zone-title">
+          <h2>Looking back</h2>
+          <span class="z-sub">A summary of how the last couple of weeks have gone</span>
+        </div>
+
+        <div class="grid g-2" style="margin-bottom:var(--sp-5)">
+
+          {# ---- Self-care score, with an honest explanation ---- #}
+          <div class="panel">
+            <div class="p-title"><svg class="ic"><use href="#i-activity"/></svg>Self-care score</div>
+            <div class="p-body tall">
+              <div class="score-card">
+                <div class="s-ring">
+                  <svg viewBox="0 0 74 74" role="img" aria-label="Self-care score {{ health_score }} out of 100">
+                    <circle cx="37" cy="37" r="31" fill="none" stroke="#E1E9DC" stroke-width="7"/>
+                    <circle cx="37" cy="37" r="31" fill="none" stroke="#48733D" stroke-width="7" stroke-linecap="round"
+                            stroke-dasharray="195" stroke-dashoffset="{{ score_offset }}" transform="rotate(-90 37 37)"/>
+                  </svg>
+                  <div class="ctext"><span class="n">{{ health_score }}</span><span class="d">out of 100</span></div>
+                </div>
+                <div class="s-body">
+                  <div class="s-band">{{ health_band }}</div>
+                  <p class="s-note">
+                    This reflects how well you have kept up with your own health routine &mdash;
+                    logging readings, taking medicines and sleeping enough. It is not a medical assessment
+                    and it does not diagnose anything.
+                  </p>
+                </div>
+              </div>
+
+              <details class="explain">
+                <summary>How is this worked out?</summary>
+                <div class="x-body">
+                  Everyone starts at 100. Points come off only for things we can measure from what you have logged:
+                  <ul>
+                    <li><strong>Recent readings</strong> &mdash; up to 35 points if several of your last readings were outside the usual range, plus 8 if your average blood sugar has been high.</li>
+                    <li><strong>Medicines</strong> &mdash; up to 20 points, in proportion to doses not marked as taken over the last 14 days.</li>
+                    <li><strong>Sleep</strong> &mdash; 6 points if your average sleep over the last week is under target.</li>
+                    <li><strong>No readings at all</strong> &mdash; 20 points, because we cannot tell how you are doing.</li>
+                  </ul>
+                  <span class="disclaimer">Only a doctor can assess your health. If you feel unwell, contact your provider &mdash; whatever this number says.</span>
+                </div>
+              </details>
+            </div>
+          </div>
+
+          {# ---- Recent activity ---- #}
+          <div class="panel">
+            <div class="p-title"><svg class="ic"><use href="#i-clock"/></svg>What you've logged recently</div>
+            <div class="p-body">
+              {% for a in activity %}
+              <div class="act">
+                <span class="ai {{ a.tint }}"><svg class="ic"><use href="#{{ a.icon }}"/></svg></span>
+                <div><div class="t">{{ a.title }}</div><div class="s">{{ a.when|date:"j M Y, g:i A" }}</div></div>
+              </div>
+              {% empty %}
+              <div class="empty">
+                <div class="e-ic"><svg class="ic"><use href="#i-inbox"/></svg></div>
+                <h4>Nothing logged yet</h4>
+                <p>Once you record a reading or mark a medicine as taken, it will show up here.</p>
+                <a class="btn btn-primary" href="{% url 'health_vitals' %}">Log my first reading</a>
+              </div>
+              {% endfor %}
+            </div>
           </div>
         </div>
 
-        {% if care_plans %}
-        <div class="panel">
-          <div class="p-title"><svg class="ic"><use href="#i-target"/></svg> Care Plans from Your Provider</div>
-          <div class="p-body">
-            {% for plan in care_plans %}
-            <div class="goal">
-              <div class="g-top"><svg class="ic" style="color:{% if plan.progress.on_target %}#22c55e{% else %}#f59e0b{% endif %};"><use href="#i-target"/></svg>
-                <span class="g-name">{{ plan.get_metric_display }}</span>
-                <span class="g-val">{% if plan.progress %}{{ plan.progress.current_value|floatformat:1 }} (target {{ plan.target_value|floatformat:1 }}){% else %}No data yet{% endif %}</span></div>
-              {% if plan.progress %}
-              <div class="bar"><span style="width:{% if plan.progress.on_target %}100{% else %}50{% endif %}%;background:{% if plan.progress.on_target %}#22c55e{% else %}#f59e0b{% endif %};"></span></div>
-              <div class="hint">{{ plan.progress.explanation }} &mdash; set by {{ plan.provider.display_name }}</div>
-              {% else %}
-              <div class="hint">Log this metric to see progress against the target set by {{ plan.provider.display_name }}.</div>
-              {% endif %}
-              {% if plan.note %}<div class="hint">{{ plan.note }}</div>{% endif %}
+        {% if care_plans or suggestions %}
+        <div class="grid g-2">
+          {% if care_plans %}
+          <div class="panel">
+            <div class="p-title"><svg class="ic"><use href="#i-target"/></svg>Goals set by your provider</div>
+            <div class="p-body">
+              {% for plan in care_plans %}
+              <div class="goal g{% cycle '2' '1' '3' '4' %}">
+                <div class="g-top">
+                  <svg class="ic"><use href="#i-target"/></svg>
+                  <span class="g-name">{{ plan.get_metric_display }}</span>
+                  <span class="g-val">{% if plan.progress %}{{ plan.progress.current_value|floatformat:1 }} &middot; aiming for {{ plan.target_value|floatformat:1 }}{% else %}Nothing logged yet{% endif %}</span>
+                </div>
+                {% if plan.progress %}
+                <div class="bar"><span style="width:{% if plan.progress.on_target %}100{% else %}50{% endif %}%"></span></div>
+                <p class="hint">{{ plan.progress.explanation }} &mdash; set by {{ plan.provider.display_name }}</p>
+                {% else %}
+                <p class="hint">Log this to see how you are doing against the target {{ plan.provider.display_name }} set for you.</p>
+                {% endif %}
+                {% if plan.note %}<p class="hint">{{ plan.note }}</p>{% endif %}
+              </div>
+              {% endfor %}
             </div>
-            {% endfor %}
           </div>
+          {% endif %}
+
+          {% if suggestions %}
+          <div class="panel">
+            <div class="p-title"><svg class="ic"><use href="#i-leaf"/></svg>Small things that might help</div>
+            <div class="p-body">
+              <div class="callout muted">
+                <svg class="ic"><use href="#i-info"/></svg>
+                <div class="c-body">These come from your own recent logs. They are everyday suggestions about habits &mdash; not medical advice, and not a diagnosis.</div>
+              </div>
+              {% for s in suggestions %}
+              <div class="goal">
+                <div class="g-top"><svg class="ic"><use href="#i-leaf"/></svg><span class="g-name">{{ s.title }}</span></div>
+                <p class="hint">{{ s.reason }}</p>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
         </div>
         {% endif %}
+      </section>
 
-        {% if suggestions %}
-        <div class="panel">
-          <div class="p-title"><svg class="ic"><use href="#i-sparkles"/></svg> Suggestions for you</div>
-          <div class="p-body">
-            <p style="color:var(--muted);font-size:12.5px;margin:0 0 12px;">Based on your own recent logs, not a diagnosis &mdash; lifestyle and adherence nudges only.</p>
-            {% for s in suggestions %}
-            <div class="goal">
-              <div class="g-top"><svg class="ic" style="color:#0d9488;"><use href="#i-sparkles"/></svg>
-                <span class="g-name">{{ s.title }}</span></div>
-              <div class="hint">{{ s.reason }}</div>
-            </div>
-            {% endfor %}
-          </div>
-        </div>
-        {% endif %}
 
-        <div class="panel">
-          <div class="p-title"><svg class="ic"><use href="#i-target"/></svg> Today's Goals <a class="more" href="{% url 'health_lifestyle' %}">Log <svg class="ic"><use href="#i-arrow-right"/></svg></a></div>
-          <div class="p-body">
-            {% for g in goals %}
-            <div class="goal">
-              <div class="g-top"><svg class="ic" style="color:{{ g.colour }};"><use href="#{{ g.icon }}"/></svg>
-                <span class="g-name">{{ g.name }}</span><span class="g-val">{{ g.value }}</span></div>
-              <div class="bar"><span style="width:{{ g.pct }}%;background:{{ g.colour }};"></span></div>
-            </div>
-            {% endfor %}
-          </div>
-        </div>
-
-        <div class="panel">
-          <div class="p-title"><svg class="ic"><use href="#i-clock"/></svg> Today's Medicines <a class="more" href="{% url 'health_medications' %}">All <svg class="ic"><use href="#i-arrow-right"/></svg></a></div>
-          <div class="p-body">
-            {% for d in todays_doses %}
-            <div class="rem {% if not d.taken %}hl{% endif %}">
-              <span class="ri {% if d.taken %}tint-green{% else %}tint-orange{% endif %}"><svg class="ic"><use href="#i-pill"/></svg></span>
-              <div><div class="t">{{ d.medication.name }} {{ d.medication.dose }}</div>
-                <div class="s">{{ d.dose_time.get_slot_display }} at {{ d.dose_time.at_time|time:"H:i" }}
-                  &middot; {{ d.dose_time.quantity|floatformat:"-2" }}</div></div>
-              <span class="pill {% if d.taken %}ok{% elif d.is_missed %}danger{% elif d.is_due %}warn{% else %}muted{% endif %}">
-                {% if d.taken %}Taken{% elif d.is_missed %}Missed{% elif d.is_due %}Due now{% else %}Later{% endif %}</span>
-            </div>
-            {% empty %}
-            <p style="color:var(--muted);font-size:13.5px;">No active medicines. Add one from the medicines page.</p>
-            {% endfor %}
-          </div>
-        </div>
-      </div>
-
+      {% comment %}EVIDENCE — kept last, collapsed. Transparency without clutter.{% endcomment %}
       {% if insights %}
-      <div class="panel" style="margin-top:22px;"><div class="p-body tall">
-        <h3 class="p-h"><svg class="ic"><use href="#i-sparkles"/></svg> Why we're saying that</h3>
-        <p style="color:var(--muted);font-size:13.5px;margin:0 0 12px;">Every observation above comes from a rule you can inspect &mdash; here is the evidence behind each one.</p>
-        <table class="dtable">
-          <thead><tr><th>Level</th><th>Observation</th><th>Evidence</th></tr></thead>
-          <tbody>
-            {% for i in insights %}
-            <tr>
-              <td><span class="pill {% if i.level == 'CRITICAL' %}danger{% elif i.level == 'WARNING' %}warn{% else %}muted{% endif %}">{{ i.get_level_display }}</span></td>
-              <td>{{ i.text }}</td>
-              <td style="color:var(--muted);font-size:12.5px;">{{ i.evidence }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div></div>
+      <section class="zone">
+        <div class="panel">
+          <div class="p-body tall">
+            <details class="explain">
+              <summary>Where these observations come from</summary>
+              <div class="x-body">
+                <p style="margin-bottom:var(--sp-3)">Every observation on this page comes from a rule you can inspect. Here is the evidence behind each one.</p>
+                <div class="table-wrap">
+                  <table class="dtable">
+                    <thead><tr><th scope="col">How important</th><th scope="col">What we noticed</th><th scope="col">Why we said it</th></tr></thead>
+                    <tbody>
+                      {% for i in insights %}
+                      <tr>
+                        <td>
+                          {% if i.level == 'CRITICAL' %}<span class="status status--warning"><svg class="ic"><use href="#i-alert-triangle"/></svg>Important</span>
+                          {% elif i.level == 'WARNING' %}<span class="status status--attention"><svg class="ic"><use href="#i-alert-circle"/></svg>Worth a look</span>
+                          {% else %}<span class="status status--completed"><svg class="ic"><use href="#i-check"/></svg>For information</span>{% endif %}
+                        </td>
+                        <td>{{ i.text }}</td>
+                        <td style="color:var(--ink-soft)">{{ i.evidence }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
       {% endif %}
 
 {% endblock %}

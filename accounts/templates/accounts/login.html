@@ -1,38 +1,266 @@
-{% extends 'base_auth.html' %}
+{% extends 'base_public.html' %}
+{% load static %}
 {% block title %}Log in &middot; CareNest{% endblock %}
-{% block side_title %}Welcome back.{% endblock %}
-{% block side_text %}Log in to reach your dashboard &mdash; patient, caregiver, provider, nurse or admin.{% endblock %}
 
-{% block auth_content %}
-      <h1 class="a-title">Log in to your account</h1>
-      <p class="a-sub">Enter your details to continue to your dashboard.</p>
+{% block body %}
+
+<section class="hero" id="main">
+  <div class="hero-media" role="img" aria-label="A nurse sitting with an older patient in a bright, calm clinic room"></div>
+
+  <header class="pub-top">
+    <div class="brand">
+      <span class="logo">
+        <svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M12 21s-6.8-4.4-9.3-8.7C.9 8.9 2.7 4.8 6.7 4.8c2.1 0 3.6 1.3 5.3 3.4 1.7-2.1 3.2-3.4 5.3-3.4 4 0 5.8 4.1 4 7.5C18.8 16.6 12 21 12 21z"/></svg>
+      </span>
+      <span class="name">CareNest<span class="tag">Where care continues</span></span>
+    </div>
+    <span class="spacer"></span>
+    <a class="t-link" href="#services">What we do</a>
+    <a class="btn btn-secondary btn-sm" href="{% url 'register' %}">Create an account</a>
+  </header>
+
+  <div class="hero-inner">
+
+    <div class="hero-copy">
+      <h1>CareNest</h1>
+      <p class="tagline">Where care continues.</p>
+
+      <figure class="hero-visual">
+        <img src="{% static 'img/login-visual.svg' %}"
+             alt="A continuous loop of care connecting a person at the centre with their readings, medicines, care team and family">
+      </figure>
+    </div>
+
+    <div class="signin">
+      <h2>Log in</h2>
+      <p class="s-sub">Welcome back. Continue to your dashboard.</p>
 
       {% if form.non_field_errors %}
       <div class="callout danger">
-        <svg class="ic"><use href="#i-shield-alert"/></svg>
+        <svg class="ic" aria-hidden="true"><use href="#i-alert-triangle"/></svg>
         <div class="c-body">{% for error in form.non_field_errors %}{{ error }}{% endfor %}</div>
       </div>
       {% endif %}
 
       {% for message in messages %}
-      <div class="callout {% if message.tags == 'error' %}danger{% else %}info{% endif %}">
-        <svg class="ic"><use href="#i-sparkles"/></svg><div class="c-body">{{ message }}</div>
+      <div class="callout {% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warn{% else %}info{% endif %}">
+        <svg class="ic" aria-hidden="true"><use href="#{% if message.tags == 'error' %}i-alert-triangle{% else %}i-info{% endif %}"/></svg>
+        <div class="c-body">{{ message }}</div>
       </div>
       {% endfor %}
 
-      <div class="panel"><div class="p-body" style="padding:24px;">
-        <form method="post" novalidate>
-          {% csrf_token %}
-          <div class="field"><label>Email</label>{{ form.email }}{{ form.email.errors }}</div>
-          <div class="field">
-            <label>Password</label>
-            {{ form.password }}{{ form.password.errors }}
-            <div style="text-align:right;margin-top:6px;">
-              <a href="{% url 'password_reset' %}" style="font-size:13px;">Forgot password?</a>
-            </div>
+      <form method="post" novalidate>
+        {% csrf_token %}
+
+        <div class="field {% if form.email.errors %}has-error{% endif %}">
+          <label for="{{ form.email.id_for_label }}">Email address</label>
+          {{ form.email }}
+          {% for e in form.email.errors %}
+          <p class="field-error"><svg class="ic" aria-hidden="true"><use href="#i-alert-circle"/></svg>{{ e }}</p>
+          {% endfor %}
+        </div>
+
+        <div class="field {% if form.password.errors %}has-error{% endif %}">
+          <label for="{{ form.password.id_for_label }}">Password</label>
+          {{ form.password }}
+          {% for e in form.password.errors %}
+          <p class="field-error"><svg class="ic" aria-hidden="true"><use href="#i-alert-circle"/></svg>{{ e }}</p>
+          {% endfor %}
+
+          <div style="text-align:right;margin-top:6px;">
+            <a href="{% url 'password_reset' %}" style="font-size:13px;">Forgot password?</a>
           </div>
-          <button type="submit" class="btn btn-teal block" style="margin-top:4px;">Log in</button>
-        </form>
-      </div></div>
-      <div class="auth-foot">New here? <a href="{% url 'register' %}">Create an account</a></div>
+        </div>
+
+        <button type="submit" class="btn btn-primary block btn-lg">Log in</button>
+      </form>
+
+      <div class="s-foot">
+        New here? <a href="{% url 'register' %}">Create an account</a>
+      </div>
+    </div>
+
+  </div>
+
+  <span class="hero-cue">See what CareNest does <svg class="ic" aria-hidden="true"><use href="#i-chevron-down"/></svg></span>
+</section>
+
+
+{% comment %}SERVICES — what the application actually offers.{% endcomment %}
+<section class="pub-section" id="services">
+  <div class="pub-inner">
+
+    <div class="sec-head">
+      <div class="eyebrow">What CareNest does</div>
+      <h2>Everything your health needs between visits</h2>
+      <p>Nine parts of looking after yourself, in one place &mdash; built for people managing
+         long-term conditions, and for the family and professionals helping them.</p>
+    </div>
+
+    <div class="svc-grid">
+
+      <article class="svc">
+        <span class="s-ic"><svg class="ic" aria-hidden="true"><use href="#i-heart-pulse"/></svg></span>
+        <h3>Track your readings</h3>
+        <p>Log blood pressure, pulse, blood sugar and weight in seconds. CareNest shows you the
+           trend rather than a wall of numbers, and tells you plainly when something has moved.</p>
+        <span class="s-tag">Vitals &amp; trends</span>
+      </article>
+
+      <article class="svc">
+        <span class="s-ic"><svg class="ic" aria-hidden="true"><use href="#i-pill"/></svg></span>
+        <h3>Never miss a dose</h3>
+        <p>Set the times you take each medicine and get a reminder when one is due. Mark it off in
+           one tap, and see at a glance what you have already taken today.</p>
+        <span class="s-tag">Medicines &amp; reminders</span>
+      </article>
+
+      <article class="svc is-accent">
+        <span class="s-ic"><svg class="ic" aria-hidden="true"><use href="#i-upload-cloud"/></svg></span>
+        <h3>Photograph your prescription</h3>
+        <p>Take a picture and CareNest reads the medicines, doses and timings from it, then asks you
+           to confirm before anything is saved. No typing out long names.</p>
+        <span class="s-tag">AI-assisted reading</span>
+      </article>
+
+      <article class="svc">
+        <span class="s-ic"><svg class="ic" aria-hidden="true"><use href="#i-flask"/></svg></span>
+        <h3>Understand your lab reports</h3>
+        <p>Upload a report and see the values pulled out and placed alongside your history, so you
+           can see what has changed since last time.</p>
+        <span class="s-tag">Lab results</span>
+      </article>
+
+      <article class="svc">
+        <span class="s-ic"><svg class="ic" aria-hidden="true"><use href="#i-stethoscope"/></svg></span>
+        <h3>Stay with your provider</h3>
+        <p>Book appointments, send your recent readings ahead of a visit, and follow the goals your
+           doctor sets for you between consultations.</p>
+        <span class="s-tag">Appointments &amp; care plans</span>
+      </article>
+
+      <article class="svc">
+        <span class="s-ic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>
+        <h3>Let family help</h3>
+        <p>Link a son, daughter or carer to your account so they can keep an eye on your medicines
+           and appointments &mdash; only after you approve them.</p>
+        <span class="s-tag">Caregivers</span>
+      </article>
+
+      <article class="svc">
+        <span class="s-ic"><svg class="ic" aria-hidden="true"><use href="#i-share"/></svg></span>
+        <h3>Share on your terms</h3>
+        <p>Give a provider access to exactly the records you choose, for as long as you choose. Every
+           time someone opens your records, it is written down.</p>
+        <span class="s-tag">Consent &amp; audit trail</span>
+      </article>
+
+      <article class="svc is-private">
+        <span class="s-ic"><svg class="ic" aria-hidden="true"><use href="#i-leaf"/></svg></span>
+        <h3>A private place to think</h3>
+        <p>Note how you are feeling, keep a mood record, or write something down and throw it away.
+           This section is never shared with providers or caregivers.</p>
+        <span class="s-tag">Mental wellbeing &mdash; private</span>
+      </article>
+
+      <article class="svc">
+        <span class="s-ic"><svg class="ic" aria-hidden="true"><use href="#i-activity"/></svg></span>
+        <h3>Build better days</h3>
+        <p>Water, steps and sleep, tracked against simple daily goals &mdash; the everyday habits that
+           make the clinical numbers easier to manage.</p>
+        <span class="s-tag">Daily habits</span>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+
+{% comment %}CONTINUITY — the idea the tagline is making.{% endcomment %}
+<section class="pub-section alt">
+  <div class="pub-inner">
+    <div class="continuum">
+      <h2>Care doesn't stop when you leave the clinic</h2>
+      <p>A consultation lasts fifteen minutes. The months around it are where a condition is
+         actually managed &mdash; and that is the part CareNest is built for.</p>
+
+      <div class="chain">
+        <div class="step-b">
+          <span class="n">1</span>
+          <h4>Before your visit</h4>
+          <p>Arrive with your readings already recorded and your medicines up to date. Send a summary
+             ahead so your provider has read it before you sit down.</p>
+        </div>
+        <div class="step-b">
+          <span class="n">2</span>
+          <h4>During your visit</h4>
+          <p>Your provider sees the history you agreed to share &mdash; not a blank page and a
+             half-remembered account of the last three months.</p>
+        </div>
+        <div class="step-b">
+          <span class="n">3</span>
+          <h4>After your visit</h4>
+          <p>New prescriptions, new targets and new reminders carry straight into your day, with your
+             caregivers kept in the loop.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+{% comment %}ROLES — who the platform serves.{% endcomment %}
+<section class="pub-section">
+  <div class="pub-inner">
+    <div class="sec-head">
+      <div class="eyebrow">Who it's for</div>
+      <h2>One platform, five points of view</h2>
+      <p>Everyone involved in your care gets the view that suits their job &mdash; and sees only what
+         you have allowed them to see.</p>
+    </div>
+
+    <div class="role-grid">
+      <div class="role-card">
+        <span class="r-ic"><svg class="ic" aria-hidden="true"><use href="#i-user"/></svg></span>
+        <h4>Patients</h4>
+        <p>Track, remember and understand your own health.</p>
+      </div>
+      <div class="role-card">
+        <span class="r-ic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>
+        <h4>Caregivers</h4>
+        <p>Help a parent or partner without phoning every day.</p>
+      </div>
+      <div class="role-card">
+        <span class="r-ic"><svg class="ic" aria-hidden="true"><use href="#i-stethoscope"/></svg></span>
+        <h4>Providers</h4>
+        <p>See real history, set targets, follow up properly.</p>
+      </div>
+      <div class="role-card">
+        <span class="r-ic"><svg class="ic" aria-hidden="true"><use href="#i-heart-pulse"/></svg></span>
+        <h4>Nurses</h4>
+        <p>Plan home visits and record what happened on them.</p>
+      </div>
+      <div class="role-card">
+        <span class="r-ic"><svg class="ic" aria-hidden="true"><use href="#i-pill"/></svg></span>
+        <h4>Pharmacies</h4>
+        <p>Take repeat orders before someone runs out.</p>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin-top:48px">
+      <a class="btn btn-primary btn-lg" href="{% url 'register' %}">Create your account<svg class="ic" aria-hidden="true"><use href="#i-arrow-right"/></svg></a>
+      <p style="font-size:var(--fs-sm);color:var(--muted);margin-top:var(--sp-4)">Already registered? <a href="#main">Log in above</a></p>
+    </div>
+  </div>
+</section>
+
+
+<footer class="pub-foot">
+  <div class="f-inner">
+    <span>CareNest &mdash; where care continues</span>
+    <span class="spacer"></span>
+    <span>Your data is yours. Nothing is shared without your consent.</span>
+  </div>
+</footer>
+
 {% endblock %}
