@@ -575,3 +575,19 @@ textarea.inp { resize:vertical; min-height:70px; }
 .journey { padding-bottom: 26px; }
 .journey .step:last-of-type { margin-bottom: 4px; }
 .journey .step .t, .journey .step .s { max-width: 150px; }
+
+/* Field-level form errors -- Django renders {{ field.errors }} as a plain
+   <ul class="errorlist"><li>...</li></ul> with no classes of its own, which
+   is why it showed up as a bare browser bullet list. Restyled site-wide
+   (this file is shared by every dashboard page AND the auth pages) as
+   compact red text with a leading asterisk instead of a bullet, so a field
+   error reads as "this field has a problem" at a glance rather than a list
+   of unrelated items. */
+.errorlist { list-style: none; margin: 6px 0 0; padding: 0; }
+.errorlist li {
+    color: var(--red-500, #dc2626);
+    font-size: 13px;
+    line-height: 1.4;
+    margin-top: 3px;
+}
+.errorlist li::before { content: "* "; font-weight: 700; }

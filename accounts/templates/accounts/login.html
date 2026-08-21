@@ -24,7 +24,13 @@
         <form method="post" novalidate>
           {% csrf_token %}
           <div class="field"><label>Email</label>{{ form.email }}{{ form.email.errors }}</div>
-          <div class="field"><label>Password</label>{{ form.password }}{{ form.password.errors }}</div>
+          <div class="field">
+            <label>Password</label>
+            {{ form.password }}{{ form.password.errors }}
+            <div style="text-align:right;margin-top:6px;">
+              <a href="{% url 'password_reset' %}" style="font-size:13px;">Forgot password?</a>
+            </div>
+          </div>
           <button type="submit" class="btn btn-teal block" style="margin-top:4px;">Log in</button>
         </form>
       </div></div>

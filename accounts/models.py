@@ -58,6 +58,15 @@ class User(AbstractUser):
     unique_id = models.CharField(max_length=12, unique=True, blank=True)
     phone_number = models.CharField(max_length=20, blank=True)
 
+    # AbstractUser's email is blank=True but NOT unique -- that gap is what
+    # forced accounts/views.py::_username_for_login to exist (it has to
+    # disambiguate when more than one account shares an email). We always
+    # register with username == email, so a non-unique email is really a
+    # non-unique login identity. Overridden here to close that gap; emails
+    # are also lower-cased on save so the DB-level constraint matches the
+    # case-insensitive (__iexact) lookups used everywhere else in the app.
+    email = models.EmailField('email address', unique=True)
+
     # --- Profile details, filled in progressively after sign-up ---
     # All optional: the CareNest flow lets a patient reach their dashboard
     # immediately and complete these later. `profile_completion` turns them
@@ -110,6 +119,11 @@ class User(AbstractUser):
         # auto-generate a unique id the first time the user is saved
         if not self.unique_id:
             self.unique_id = uuid.uuid4().hex[:10].upper()
+        # Normalise case so the `unique=True` constraint above actually
+        # matches "same email" the way a human -- and every __iexact lookup
+        # in this codebase -- means it.
+        if self.email:
+            self.email = self.email.strip().lower()
         super().save(*args, **kwargs)
 
     def profile_completion(self):

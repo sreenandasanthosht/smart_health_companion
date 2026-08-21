@@ -8,14 +8,15 @@
       <h1 class="a-title" style="margin-top:10px;">{{ content.heading }}</h1>
       <p class="a-sub">{{ content.intro }}</p>
 
-      <form method="post">
+      <form method="post" novalidate>
         {% csrf_token %}
         <div class="step-card">
           <div class="s-head"><span class="s-num">1</span><h3>Your details</h3></div>
-          {% for f in content.fields %}
+          {% for field in form %}
           <div class="field">
-            <label>{{ f.label }}</label>
-            <input type="{{ f.type }}" name="{{ f.name }}" class="inp" placeholder="{{ f.placeholder }}">
+            <label>{{ field.label }}</label>
+            {{ field }}
+            {{ field.errors }}
           </div>
           {% endfor %}
         </div>

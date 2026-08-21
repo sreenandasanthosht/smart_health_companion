@@ -257,6 +257,9 @@ def vitals(request):
             blood_sugar = _parse_decimal(request.POST.get('blood_sugar'))
             weight_kg = _parse_decimal(request.POST.get('weight_kg'))
             heart_rate = _parse_int(request.POST.get('heart_rate'))
+            spo2 = _parse_int(request.POST.get('spo2'))
+            if spo2 is not None and not (0 <= spo2 <= 100):
+                raise ValueError('SpO2 should be a percentage between 0 and 100.')
         except ValueError as exc:
             messages.error(request, str(exc) or 'Please check the values you entered.')
         else:
@@ -264,6 +267,7 @@ def vitals(request):
                 patient=request.user,
                 bp_systolic=bp_systolic, bp_diastolic=bp_diastolic,
                 blood_sugar=blood_sugar, weight_kg=weight_kg, heart_rate=heart_rate,
+                spo2=spo2,
                 source=VitalRecord.Source.SELF, entered_by=request.user,
             )
             analytics.generate_insights(request.user)

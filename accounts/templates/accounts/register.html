@@ -27,6 +27,7 @@
               <label>{{ radio.tag }} <span>{{ radio.choice_label }}</span></label>
               {% endfor %}
             </div>
+            {{ form.role.errors }}
           </div>
           <div class="field" id="caregiver-field" style="display:none;">
             <label>{{ form.caregiver_patient_ref.label }}</label>
@@ -43,6 +44,13 @@
           <div class="grid g-2" style="gap:14px;">
             <div class="field"><label>{{ form.password.label }}</label>{{ form.password }}{{ form.password.errors }}</div>
             <div class="field"><label>{{ form.confirm_password.label }}</label>{{ form.confirm_password }}{{ form.confirm_password.errors }}</div>
+          </div>
+          <div class="field" style="margin-top:6px;">
+            <label style="display:flex;align-items:flex-start;gap:8px;font-weight:500;">
+              {{ form.agree_to_terms }}
+              <span>{{ form.agree_to_terms.label }}</span>
+            </label>
+            {{ form.agree_to_terms.errors }}
           </div>
           <button type="submit" class="btn btn-teal block" style="margin-top:4px;">Create account &amp; continue</button>
         </form>

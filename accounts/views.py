@@ -12,11 +12,14 @@ Post-signup routing follows the CareNest onboarding spec:
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.password_validation import validate_password
-from django.core.exceptions import ValidationError
+from django.core.cache import cache
+from django.db import IntegrityError
 from django.shortcuts import redirect, render
 
-from accounts.forms import LoginForm, PUBLIC_ROLE_CHOICES, RegisterForm
+from accounts.forms import (
+    CaregiverOnboardingForm, LoginForm, ProviderOnboardingForm,
+    PUBLIC_ROLE_CHOICES, RegisterForm,
+)
 from accounts.devices import register_device, set_device_cookie
 from accounts.linking import create_link_request, resolve_patient
 from accounts.models import (
@@ -29,12 +32,7 @@ ONBOARDING_CONTENT = {
         'label': 'Caregiver',
         'heading': 'Link to the patient you support',
         'intro': "You'll get read-only access once the patient approves your request.",
-        'fields': [
-            {'name': 'relationship', 'label': 'Relationship to patient', 'type': 'text',
-             'placeholder': 'e.g. Daughter, Spouse, Son'},
-            {'name': 'phone_number', 'label': 'Contact number', 'type': 'text',
-             'placeholder': '+91 98765 43210'},
-        ],
+        'form_class': CaregiverOnboardingForm,
         'next_url_name': 'health_caregiver_dashboard',
         'next_label': 'Go to caregiver dashboard',
     },
@@ -42,18 +40,7 @@ ONBOARDING_CONTENT = {
         'label': 'Provider',
         'heading': 'Submit your credentials for verification',
         'intro': 'An administrator reviews every submission before your listing goes live.',
-        'fields': [
-            {'name': 'specialty', 'label': 'Specialty or service', 'type': 'text',
-             'placeholder': 'e.g. General Physician'},
-            {'name': 'clinic_name', 'label': 'Clinic / organisation name', 'type': 'text',
-             'placeholder': 'e.g. City Care Clinic'},
-            {'name': 'years_experience', 'label': 'Years of experience', 'type': 'number',
-             'placeholder': 'e.g. 9'},
-            {'name': 'registration_number', 'label': 'Registration / licence number', 'type': 'text',
-             'placeholder': 'e.g. KMC-2014-88213'},
-            {'name': 'address', 'label': 'Address', 'type': 'text',
-             'placeholder': 'Street, area, city'},
-        ],
+        'form_class': ProviderOnboardingForm,
         'next_url_name': 'provider_pending',
         'next_label': 'Submit for verification',
     },
@@ -75,31 +62,43 @@ def register_view(request):
     if request.method == 'POST':
         form = RegisterForm(request.POST)
         if form.is_valid():
-            email = form.cleaned_data['email']
+            # Normalised once, here, so the duplicate check below and the
+            # account actually created always agree on what "this email"
+            # means -- User.save() would lower-case it anyway, but doing it
+            # before the pre-check avoids a false negative on mixed case.
+            #
+            # Password match and strength are now enforced in
+            # RegisterForm.clean() -- form.is_valid() above already ran
+            # them, so getting here means both already passed. Only the
+            # duplicate-email check remains a view-level concern: it needs
+            # a DB query at submit time, not something a form's clean()
+            # should be doing on every partial validation pass.
+            email = form.cleaned_data['email'].strip().lower()
             password = form.cleaned_data['password']
-            confirm_password = form.cleaned_data['confirm_password']
             role = form.cleaned_data['role']
             full_name = form.cleaned_data['full_name'].strip()
             phone_number = form.cleaned_data['phone_number']
 
-            if password != confirm_password:
-                form.add_error('confirm_password', "Passwords don't match.")
-            elif User.objects.filter(username__iexact=email).exists():
+            if User.objects.filter(email__iexact=email).exists():
                 form.add_error('email', 'An account with this email already exists.')
-            else:
-                try:
-                    validate_password(password)
-                except ValidationError as exc:
-                    for err in exc.messages:
-                        form.add_error('password', err)
 
             if not form.errors:
                 first_name, _, last_name = full_name.partition(' ')
-                user = User.objects.create_user(
-                    username=email, email=email, password=password,
-                    first_name=first_name, last_name=last_name,
-                    role=role, phone_number=phone_number,
-                )
+                try:
+                    user = User.objects.create_user(
+                        username=email, email=email, password=password,
+                        first_name=first_name, last_name=last_name,
+                        role=role, phone_number=phone_number,
+                    )
+                except IntegrityError:
+                    # Belt-and-braces against a second request winning a race
+                    # on the same email between the check above and this
+                    # insert -- now that email is unique at the DB level,
+                    # the second request must fail cleanly, not 500.
+                    form.add_error('email', 'An account with this email already exists.')
+                    return render(request, 'accounts/register.html', {
+                        'form': form, 'roles': form.fields['role'].choices,
+                    })
 
                 if role == User.Role.CAREGIVER:
                     patient, invite, error = resolve_patient(form.cleaned_data['caregiver_patient_ref'])
@@ -118,6 +117,12 @@ def register_view(request):
 
                 login(request, user)
                 AuditLog.record(user, 'Registered an account', user.get_role_display(), AuditLog.Tag.MUTED)
+                # form.is_valid() already required agree_to_terms to be
+                # checked, so reaching here means consent was given -- this
+                # is a separate, explicitly-labelled audit entry rather than
+                # folding it into the line above, so "did this user accept
+                # the terms, and when" can be answered on its own later.
+                AuditLog.record(user, 'Accepted Terms of Service and Privacy Policy', '', AuditLog.Tag.MUTED)
 
                 # Patients skip the wizard and land on their dashboard, with a
                 # profile-completion prompt waiting for them there.
@@ -146,22 +151,71 @@ def _username_for_login(typed_email):
     superuser can end up as username='admin', email='admin@example.com'.
     Without this lookup such an account can never sign in to the app --
     typing the username fails email validation, and typing the email finds
-    no matching username.
+    no matching username. That case is unrelated to email uniqueness, so
+    this helper is still needed even now that email is a unique column.
 
-    Matching on email is tried first; if nothing matches we fall back to
-    treating the input as the username, which keeps the normal case working
-    even before any User rows exist.
+    What migration 0009 (email uniqueness) DID remove is the ambiguity this
+    used to have to handle: `email__iexact` can now match at most one row,
+    never several, so there is no "which one did they mean" case left --
+    only "did we find one, or not."
+
+    If nothing matches, we fall back to treating the input as the username,
+    which keeps the normal case working even before any User rows exist.
     """
-    match = User.objects.filter(email__iexact=typed_email)
-    if match.count() == 1:
-        return match.first().username
-    if match.count() > 1:
-        # Shouldn't happen (registration blocks duplicate emails), but if it
-        # does, prefer the account whose username is also the email.
-        exact = match.filter(username__iexact=typed_email).first()
-        if exact:
-            return exact.username
-    return typed_email
+    match = User.objects.filter(email__iexact=typed_email).first()
+    return match.username if match else typed_email
+
+
+# --- Login lockout ---------------------------------------------------------
+#
+# Unlimited password guesses were possible before this: no rate limit and no
+# lockout on failed logins. This adds one without a new dependency (no
+# django-axes) -- a small counter in Django's cache, keyed two ways at once:
+#
+#   * per EMAIL, so a bot can't grind through passwords for one account
+#   * per IP,    so a bot can't grind through many accounts from one source
+#
+# Both must clear for a login attempt to be allowed through. A genuine user
+# who mistypes their password five times only trips the per-email lock,
+# which self-clears after LOGIN_LOCKOUT_SECONDS -- nobody has to contact an
+# admin to get back in.
+#
+# Caveat worth stating plainly: Django's default cache backend is
+# per-process local memory, so this lockout is only real protection when the
+# app runs as a single process (exactly this project's deployment). A
+# multi-worker production deployment would need a shared cache (Redis/
+# memcached) for the same counters to mean anything across workers.
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_LOCKOUT_SECONDS = 15 * 60  # 15 minutes
+
+
+def _client_ip(request):
+    return request.META.get('REMOTE_ADDR', 'unknown')
+
+
+def _lockout_keys(email, request):
+    return f'loginfail:email:{email.strip().lower()}', f'loginfail:ip:{_client_ip(request)}'
+
+
+def _is_locked_out(email, request):
+    email_key, ip_key = _lockout_keys(email, request)
+    return (cache.get(email_key, 0) >= LOGIN_MAX_ATTEMPTS
+            or cache.get(ip_key, 0) >= LOGIN_MAX_ATTEMPTS)
+
+
+def _record_failed_login(email, request):
+    for key in _lockout_keys(email, request):
+        try:
+            cache.incr(key)
+        except ValueError:
+            # incr() raises when the key doesn't exist yet (or just expired)
+            # -- this is the "first failure" case, so start the window.
+            cache.set(key, 1, timeout=LOGIN_LOCKOUT_SECONDS)
+
+
+def _clear_failed_logins(email, request):
+    for key in _lockout_keys(email, request):
+        cache.delete(key)
 
 
 def login_view(request):
@@ -173,12 +227,21 @@ def login_view(request):
         if form.is_valid():
             email = form.cleaned_data['email']
             password = form.cleaned_data['password']
+
+            if _is_locked_out(email, request):
+                form.add_error(
+                    None,
+                    'Too many failed attempts. Please wait 15 minutes before trying again.')
+                return render(request, 'accounts/login.html', {'form': form})
+
             user = authenticate(request, username=_username_for_login(email), password=password)
             if user is None:
+                _record_failed_login(email, request)
                 form.add_error(None, 'Incorrect email or password.')
             elif user.is_suspended:
                 form.add_error(None, 'This account has been suspended. Please contact support.')
             else:
+                _clear_failed_logins(email, request)
                 login(request, user)
                 response = redirect(ROLE_DASHBOARD_URL.get(user.role, 'home'))
 
@@ -212,30 +275,36 @@ def onboarding_view(request, role):
         # Patients (and anyone else) have no wizard -- send them home.
         return redirect(ROLE_DASHBOARD_URL.get(request.user.role, 'home'))
 
+    form_class = content['form_class']
+
     if request.method == 'POST':
-        if role_key == 'CAREGIVER':
-            relationship = request.POST.get('relationship', '').strip()
-            phone = request.POST.get('phone_number', '').strip()
-            if phone:
-                request.user.phone_number = phone
+        form = form_class(request.POST)
+        if form.is_valid():
+            data = form.cleaned_data
+
+            if role_key == 'CAREGIVER':
+                request.user.phone_number = data['phone_number']
                 request.user.save(update_fields=['phone_number'])
-            if relationship:
-                CaregiverLink.objects.filter(caregiver=request.user).update(relationship=relationship)
+                CaregiverLink.objects.filter(caregiver=request.user).update(
+                    relationship=data['relationship'])
 
-        elif role_key == 'PROVIDER':
-            profile = getattr(request.user, 'provider_profile', None)
-            if profile:
-                profile.specialty = request.POST.get('specialty', '').strip()
-                profile.clinic_name = request.POST.get('clinic_name', '').strip()
-                profile.registration_number = request.POST.get('registration_number', '').strip()
-                profile.address = request.POST.get('address', '').strip()
-                years = request.POST.get('years_experience', '').strip()
-                profile.years_experience = int(years) if years.isdigit() else None
-                profile.save()
+            elif role_key == 'PROVIDER':
+                profile = getattr(request.user, 'provider_profile', None)
+                if profile:
+                    profile.specialty = data['specialty']
+                    profile.clinic_name = data['clinic_name']
+                    profile.registration_number = data['registration_number']
+                    profile.address = data['address']
+                    profile.years_experience = data['years_experience']
+                    profile.save()
 
-        return redirect(content['next_url_name'])
+            return redirect(content['next_url_name'])
+    else:
+        form = form_class()
 
-    return render(request, 'accounts/onboarding.html', {'content': content, 'role': role_key})
+    return render(request, 'accounts/onboarding.html', {
+        'content': content, 'role': role_key, 'form': form,
+    })
 
 
 @login_required

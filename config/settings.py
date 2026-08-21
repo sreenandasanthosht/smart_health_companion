@@ -19,8 +19,14 @@ load_dotenv(BASE_DIR / '.env')
 # SECURITY: keep the secret key secret in production
 SECRET_KEY = os.getenv('SECRET_KEY', 'dev-insecure-change-me')
 
-# DEBUG shows detailed errors; turn OFF (False) in production
-DEBUG = os.getenv('DEBUG', 'True') == 'True'
+# DEBUG shows detailed errors; turn OFF (False) in production.
+# The fallback below only matters if DEBUG is unset in .env -- your own
+# .env currently sets DEBUG=True explicitly for local development, which
+# still wins over this default. Before your final demo/submission, set
+# DEBUG=False in .env itself (not just here) -- that's the switch that
+# actually matters; this fallback is just a safety net for anyone who
+# clones the repo without a DEBUG line in their .env at all.
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
@@ -131,6 +137,40 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 LOGIN_URL = 'login'  # used by @login_required when a page needs a real session
 LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'home'
+
+# --- Session & CSRF cookie security ---
+# None of this was set explicitly before -- Django's own defaults are
+# reasonable but not health-app-appropriate, and one of them (SECURE) can't
+# just be switched on blindly: a cookie marked Secure is refused by the
+# browser over plain HTTP, which is exactly how this project runs locally
+# (http://127.0.0.1:8000). Tying it to `not DEBUG` means it's off for local
+# development and on automatically once DEBUG=False is set for the real
+# demo/submission -- see the DEBUG comment above.
+SESSION_COOKIE_HTTPONLY = True          # JavaScript can never read the session cookie
+SESSION_COOKIE_SECURE = not DEBUG       # HTTPS-only once DEBUG is off
+CSRF_COOKIE_SECURE = not DEBUG          # same reasoning, for the CSRF cookie
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 7   # a session is valid for 1 week
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # ...and survives closing the browser within that week
+
+# --- Email (password reset) ---
+# No real mail server is configured for this project, so by default every
+# "sent" email is printed to the runserver console instead -- that's enough
+# to demo and test the reset flow end-to-end without an SMTP account. Set
+# EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend in .env (plus
+# the EMAIL_HOST_* values below) to send real email later; nothing else in
+# the reset views needs to change.
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'CareNest <no-reply@carenest.local>')
+EMAIL_HOST = os.getenv('EMAIL_HOST', '')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
+
+# How long a password-reset link stays valid, in seconds. 3 days is
+# Django's own default -- set explicitly here so it's a decision on record,
+# not an implicit default someone has to go look up.
+PASSWORD_RESET_TIMEOUT = 60 * 60 * 24 * 3
 
 # --- Document extraction (process-and-discard) ---
 # Django normally streams uploads larger than 2.5 MB to a temporary FILE on

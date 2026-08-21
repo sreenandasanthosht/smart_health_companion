@@ -6,6 +6,7 @@ import datetime
 from decimal import Decimal
 
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 
@@ -35,6 +36,15 @@ class VitalRecord(models.Model):
     blood_sugar = models.DecimalField(max_digits=6, decimal_places=1, null=True, blank=True)
     weight_kg = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
     heart_rate = models.PositiveIntegerField(null=True, blank=True)
+    # Blood oxygen saturation, percent. Optional for the same reason every
+    # other vital here is: a reading only ever carries what was actually
+    # measured. Bounded 0-100 at the field level so a typo can't produce a
+    # value compute_status() would silently misread (e.g. "990").
+    spo2 = models.PositiveIntegerField(
+        null=True, blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text='Blood oxygen saturation (%)',
+    )
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.NORMAL)
     source = models.CharField(max_length=10, choices=Source.choices, default=Source.SELF)
     entered_by = models.ForeignKey(
@@ -53,6 +63,12 @@ class VitalRecord(models.Model):
         stage-2 hypertension territory, 130-139/85-89 is elevated. This is
         the interpretable baseline the CRISP-DM write-up (task 4.8)
         compares any later trained model against.
+
+        SpO2 is the one vital here where LOWER is worse, not higher --
+        <90% is hypoxemia (treated the same as a HIGH-severity reading),
+        90-94% is a WATCH-worthy value on its own even with every other
+        vital normal (per standard pulse-oximetry guidance). A missing
+        SpO2 reading never contributes to either branch.
         """
         sys_bp = self.bp_systolic or 0
         dia_bp = self.bp_diastolic or 0
@@ -60,11 +76,13 @@ class VitalRecord(models.Model):
 
         if (sys_bp >= 140 or dia_bp >= 90
                 or (self.heart_rate and self.heart_rate >= 110)
-                or sugar >= 180):
+                or sugar >= 180
+                or (self.spo2 is not None and self.spo2 < 90)):
             return self.Status.HIGH
         if (sys_bp >= 130 or dia_bp >= 85
                 or (self.heart_rate and self.heart_rate >= 100)
-                or sugar >= 126):
+                or sugar >= 126
+                or (self.spo2 is not None and self.spo2 < 95)):
             return self.Status.WATCH
         return self.Status.NORMAL
 
