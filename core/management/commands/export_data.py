@@ -33,6 +33,7 @@ Django's own tables (permissions, content types, sessions, admin log) are
 excluded on purpose: `migrate` recreates them, and including them causes
 integrity errors on the receiving side.
 """
+import io
 from pathlib import Path
 
 from django.conf import settings
@@ -69,13 +70,22 @@ class Command(BaseCommand):
         for label in EXCLUDED:
             exclude_args += ['--exclude', label]
 
+        # dumpdata's own `output=` argument opens the file itself with the
+        # platform's default encoding -- on Windows that is cp1252, not
+        # UTF-8, so any curly quote or dash typed into a title/body field
+        # (e.g. a medication alert message) corrupts the file and breaks
+        # `loaddata` with a UnicodeDecodeError on the receiving laptop.
+        # Capture dumpdata's output as text ourselves and write it out
+        # with an explicit utf-8 encoding instead.
+        buffer = io.StringIO()
         call_command(
             'dumpdata',
             *exclude_args,
             natural_foreign=True,
             indent=2,
-            output=str(out_path),
+            stdout=buffer,
         )
+        out_path.write_text(buffer.getvalue(), encoding='utf-8', newline='\n')
 
         size_kb = out_path.stat().st_size / 1024
         self.stdout.write(self.style.SUCCESS(
