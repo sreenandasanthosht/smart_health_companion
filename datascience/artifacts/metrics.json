@@ -15,8 +15,8 @@
     "SLEEP": {
       "n_folds": 5,
       "accuracy": {
-        "mean": 0.5,
-        "std": 0.447
+        "mean": 0.8,
+        "std": 0.4
       },
       "precision": {
         "mean": 0.4,
@@ -36,8 +36,8 @@
       },
       "confusion_matrix": {
         "tp": 2,
-        "tn": 1,
-        "fp": 2,
+        "tn": 3,
+        "fp": 0,
         "fn": 1
       }
     },
@@ -73,8 +73,8 @@
     "ACTIVITY": {
       "n_folds": 5,
       "accuracy": {
-        "mean": 0.5,
-        "std": 0.447
+        "mean": 0.8,
+        "std": 0.4
       },
       "precision": {
         "mean": 0.4,
@@ -94,8 +94,8 @@
       },
       "confusion_matrix": {
         "tp": 2,
-        "tn": 1,
-        "fp": 2,
+        "tn": 3,
+        "fp": 0,
         "fn": 1
       }
     },
@@ -131,30 +131,30 @@
     "VITALS_LOGGING": {
       "n_folds": 5,
       "accuracy": {
-        "mean": 0.4,
+        "mean": 0.6,
         "std": 0.49
       },
       "precision": {
-        "mean": 0.0,
-        "std": 0.0
+        "mean": 0.2,
+        "std": 0.4
       },
       "recall": {
-        "mean": 0.0,
-        "std": 0.0
+        "mean": 0.2,
+        "std": 0.4
       },
       "f1": {
-        "mean": 0.0,
-        "std": 0.0
+        "mean": 0.2,
+        "std": 0.4
       },
       "roc_auc": {
         "mean": null,
         "std": null
       },
       "confusion_matrix": {
-        "tp": 0,
+        "tp": 1,
         "tn": 2,
         "fp": 2,
-        "fn": 2
+        "fn": 1
       }
     }
   }

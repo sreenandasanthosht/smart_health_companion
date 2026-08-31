@@ -16,6 +16,10 @@
             <svg class="ic"><use href="#i-search"/></svg>
             <input name="q" value="{{ query }}" placeholder="Search by name or specialty...">
           </div>
+          <div class="search" style="flex:1;min-width:200px;max-width:none;">
+            <svg class="ic"><use href="#i-target"/></svg>
+            <input name="location" value="{{ location_query }}" placeholder="Area, city or pincode...">
+          </div>
           <select name="group" class="inp" style="max-width:220px;">
             <option value="">All services</option>
             {% for value, label in groups %}
@@ -30,6 +34,18 @@
           </select>
           <button type="submit" class="btn btn-teal">Search</button>
         </form>
+        {% if my_address %}
+        <div style="margin-top:10px;font-size:12.5px;color:var(--muted);">
+          <a href="?location={{ my_address|urlencode }}{% if query %}&amp;q={{ query|urlencode }}{% endif %}{% if selected_group %}&amp;group={{ selected_group }}{% endif %}{% if selected_type %}&amp;type={{ selected_type }}{% endif %}">Use my saved address</a>
+          &middot; {{ my_address }}
+        </div>
+        {% endif %}
+        {% if location_query %}
+        <div style="margin-top:10px;font-size:12.5px;color:var(--muted);">
+          Showing verified providers whose address mentions &ldquo;{{ location_query }}&rdquo;.
+          <a href="?{% if query %}q={{ query|urlencode }}&amp;{% endif %}{% if selected_group %}group={{ selected_group }}&amp;{% endif %}{% if selected_type %}type={{ selected_type }}{% endif %}">Clear location</a>
+        </div>
+        {% endif %}
       </div></div>
 
       <div class="grid g-3">
@@ -54,8 +70,9 @@
         {% empty %}
         <div class="panel" style="grid-column:1/-1;"><div class="p-body tall">
           <p style="color:var(--muted);font-size:13.5px;margin:0;">
-            No verified providers match{% if query or selected_type %} that search{% endif %}.
-            {% if not query and not selected_type %}Providers appear here once an administrator approves them.{% endif %}
+            No verified providers match{% if query or selected_type %} that search{% endif %}{% if location_query %} near &ldquo;{{ location_query }}&rdquo;{% endif %}.
+            {% if location_query %}Try a wider area, or a city name instead of a street.{% endif %}
+            {% if not query and not selected_type and not location_query %}Providers appear here once an administrator approves them.{% endif %}
           </p>
         </div></div>
         {% endfor %}

@@ -5,6 +5,7 @@ provider's own dashboard, and the verification status page.
 All data here comes from the database.
 """
 import datetime
+import re
 
 from django.contrib import messages
 from django.db.models import Q
@@ -28,11 +29,40 @@ from providers.models import (
 )
 
 
+# The only location information this project holds is ProviderProfile.address --
+# one free-text line, written at whatever level of detail the provider chose
+# ("Indiranagar, Bengaluru"). A patient's own saved address is written at a
+# different level again ("Bengaluru, Karnataka"), so comparing the two strings
+# whole matches nothing even when they describe the same city. Matching on any
+# single word of what was typed is what makes both a typed area name and the
+# "use my saved address" shortcut work against the data as it is actually
+# stored, without adding a field or asking every provider to re-enter anything.
+#
+# Words shorter than three characters are dropped ("of", "nr") because they
+# match almost any address, and the list is capped so a pasted paragraph
+# cannot turn into a hundred-clause OR.
+LOCATION_MIN_TOKEN = 3
+LOCATION_MAX_TOKENS = 4
+
+
+def _location_tokens(text, limit=LOCATION_MAX_TOKENS):
+    """The words worth matching an address against, lower-cased and de-duplicated."""
+    tokens = []
+    for word in re.split(r'[^0-9A-Za-z]+', text or ''):
+        word = word.lower()
+        if len(word) >= LOCATION_MIN_TOKEN and word not in tokens:
+            tokens.append(word)
+        if len(tokens) >= limit:
+            break
+    return tokens
+
+
 @role_required(User.Role.PATIENT, User.Role.CAREGIVER)
 def directory(request):
     query = request.GET.get('q', '').strip()
     ptype = request.GET.get('type', '').strip()
     group = request.GET.get('group', '').strip()
+    location = request.GET.get('location', '').strip()
 
     providers = ProviderProfile.objects.filter(
         verification_status=ProviderProfile.Verification.VERIFIED,
@@ -50,11 +80,31 @@ def directory(request):
     if ptype:
         providers = providers.filter(provider_type=ptype)
 
+    # Location is applied last, on top of the verified-only queryset built
+    # above, so it can only ever narrow the set of providers a patient is
+    # already allowed to see -- never widen it. There is deliberately no
+    # separate "eligible provider" query here.
+    if location:
+        tokens = _location_tokens(location)
+        if tokens:
+            matches = Q(address__icontains=tokens[0])
+            for token in tokens[1:]:
+                matches |= Q(address__icontains=token)
+        else:
+            # Nothing long enough to tokenise (e.g. "GK"): fall back to the
+            # literal string rather than silently ignoring what was typed.
+            matches = Q(address__icontains=location)
+        providers = providers.filter(matches)
+
     context = {
         'providers': providers,
         'query': query,
         'selected_type': ptype,
         'selected_group': group,
+        'location_query': location,
+        # Offered as a one-click shortcut, not used automatically: the patient
+        # decides whether to search on their own saved address.
+        'my_address': (request.user.address or '').strip(),
         'types': ProviderProfile.ProviderType.choices,
         'groups': ProviderProfile.ServiceGroup.choices,
     }
